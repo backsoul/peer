@@ -1,0 +1,45 @@
+node_modules
+walkie/node_modules
+
+# See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# Compiled output
+walkie/dist
+walkie/tmp
+walkie/out-tsc
+walkie/bazel-out
+
+# Node
+walkie/node_modules
+walkie/npm-debug.log
+walkie/yarn-error.log
+
+# IDEs and editors
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/*
+
+# Miscellaneous
+walkie/.angular/cache
+walkie/.sass-cache/
+walkie/connect.lock
+walkie/coverage
+walkie/libpeerconnection.log
+walkie/testem.log
+walkie/typings
+
+# System files
+walkie/.DS_Store
+walkie/Thumbs.db
