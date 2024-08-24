@@ -10,9 +10,9 @@ services:
     environment:
       NODE_ENV: production
       TZ: America/Bogota
-      VIRTUAL_HOST: walkie.backsoul.online
+      VIRTUAL_HOST: walkie.lumisar.com
       VIRTUAL_PORT: 3000
-      LETSENCRYPT_HOST: walkie.backsoul.online
+      LETSENCRYPT_HOST: walkie.lumisar.com
       LETSENCRYPT_EMAIL: danielsarmientoenterprise@gmail.com
 
 networks:
