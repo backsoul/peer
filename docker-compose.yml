@@ -1,8 +1,23 @@
 version: '3'
 services:
-  audio-server:
+  walkie:
     build: .
-    ports:
-      - "3000:3000"
+    volumes:
+      - .:/app/
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    env_file:
+      - ./.docker/dev.env
+    networks:
+      - web
+      - underlayer_network
     environment:
-      - NODE_ENV=production
+      NODE_ENV: production
+      TZ: America/Bogota
+      VIRTUAL_HOST: walkie.backsoul.online
+      VIRTUAL_PORT: 3000
+      LETSENCRYPT_HOST: walkie.backsoul.online
+      LETSENCRYPT_EMAIL: danielsarmientoenterprise@gmail.com
+
+networks:
+  web:
+    external: true
