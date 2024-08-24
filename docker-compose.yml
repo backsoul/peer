@@ -5,8 +5,6 @@ services:
     volumes:
       - .:/app/
       - /var/run/docker.sock:/tmp/docker.sock:ro
-    env_file:
-      - ./.docker/dev.env
     networks:
       - web
       - underlayer_network
