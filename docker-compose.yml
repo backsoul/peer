@@ -7,7 +7,6 @@ services:
       - /var/run/docker.sock:/tmp/docker.sock:ro
     networks:
       - web
-      - underlayer_network
     environment:
       NODE_ENV: production
       TZ: America/Bogota
