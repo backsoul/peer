@@ -29,7 +29,7 @@ io.on('connection', (socket) => {
     console.log('Nuevo cliente conectado');
 
     socket.on('audio', (data) => {
-        socket.broadcast.emit('audio', new Blob([data]));
+        socket.broadcast.emit('audio',data);
     });
 
     socket.on('disconnect', () => {
