@@ -7,7 +7,7 @@ COPY package*.json ./
 
 # Instalar dependencias para el servidor Node.js
 RUN npm install --legacy-peer-deps
-
+RUN npm install express --legacy-peer-deps
 # Copiar el código fuente del servidor Node.js
 COPY . .
 
