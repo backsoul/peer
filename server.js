@@ -1,16 +1,8 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
-const https = require('https');
 const socketIO = require('socket.io');
 
 const app = express();
-
-// Cargar certificados
-const options = {
-    key: fs.readFileSync('localhost-key.pem'),
-    cert: fs.readFileSync('localhost.pem')
-};
 
 // Servir los archivos estáticos de Angular
 app.use(express.static(path.join(__dirname, 'public')));
@@ -20,7 +12,12 @@ app.get('/*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
-const server = https.createServer(options, app);
+// Crear un servidor HTTP en lugar de HTTPS
+const server = app.listen(process.env.PORT || 3000, () => {
+  console.log(`Servidor de audio en tiempo real corriendo en http://localhost:${server.address().port}`);
+});
+
+// Inicializar Socket.IO con el servidor HTTP
 const io = socketIO(server, {
     cors: {
       origin: "*", // Permite todas las solicitudes CORS
@@ -38,9 +35,4 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log('Cliente desconectado');
     });
-});
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Servidor de audio en tiempo real corriendo en https://localhost:${PORT}`);
 });
