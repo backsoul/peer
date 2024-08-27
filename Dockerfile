@@ -1,18 +1,29 @@
-# Stage para el servidor Node.js que servirá la aplicación Angular
-FROM node:20.11.1
+# Usar una imagen base de Go para construir la aplicación
+FROM golang:1.22.1-alpine AS builder
+
+# Establecer el directorio de trabajo
 WORKDIR /app
 
-# Copiar los archivos package.json y package-lock.json del servidor Node.js
-COPY package*.json ./
-
-# Instalar dependencias para el servidor Node.js
-RUN npm install --legacy-peer-deps
-RUN npm install express --legacy-peer-deps
-# Copiar el código fuente del servidor Node.js
+# Copiar los archivos de la aplicación al contenedor
 COPY . .
 
-# Exponer el puerto 3000 para la aplicación Node.js
+# Descargar las dependencias
+RUN go mod download
+
+# Construir la aplicación
+RUN go build -o server .
+
+# Crear una imagen más pequeña para producción
+FROM alpine:latest
+
+# Establecer el directorio de trabajo
+WORKDIR /root/
+
+# Copiar el binario desde la imagen de construcción
+COPY --from=builder /app/server .
+
+# Exponer el puerto en el que corre el servidor
 EXPOSE 3000
 
-# Comando para iniciar el servidor Node.js
-CMD ["node", "server.js"]
+# Comando para ejecutar la aplicación
+CMD ["./server"]

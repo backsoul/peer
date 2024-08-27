@@ -1,8 +1,8 @@
-version: '3'
 services:
-  walkie:
+  app:
     build: .
     volumes:
+      - .:/app/
       - /var/run/docker.sock:/tmp/docker.sock:ro
     networks:
       - web
