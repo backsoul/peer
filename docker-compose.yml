@@ -6,6 +6,8 @@ services:
       - /var/run/docker.sock:/tmp/docker.sock:ro
     networks:
       - web
+    ports:
+      - 3000:3000
     environment:
       NODE_ENV: production
       TZ: America/Bogota
