@@ -16,12 +16,19 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// Lista de conexiones activas y un mutex para manejarlas de forma segura
-var clients = make(map[*websocket.Conn]bool)
-var clientsMutex = sync.Mutex{}
+// Estructura para manejar los canales
+type Channel struct {
+	clients map[*websocket.Conn]bool
+	mutex   sync.Mutex
+}
+
+// Crear un canal de audio
+var audioChannel = Channel{
+	clients: make(map[*websocket.Conn]bool),
+}
 
 func main() {
-	http.HandleFunc("/", handleConnections)
+	http.HandleFunc("/audio", handleAudioConnections)
 
 	port := ":3000"
 	fmt.Printf("Servidor de audio en tiempo real corriendo en http://localhost%s\n", port)
@@ -31,7 +38,7 @@ func main() {
 	}
 }
 
-func handleConnections(w http.ResponseWriter, r *http.Request) {
+func handleAudioConnections(w http.ResponseWriter, r *http.Request) {
 	// Actualizar la conexión HTTP a una conexión WebSocket
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -40,47 +47,75 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
-	// Agregar el nuevo cliente a la lista de conexiones activas
-	clientsMutex.Lock()
-	clients[ws] = true
-	clientsMutex.Unlock()
+	// Agregar el nuevo cliente al canal de audio
+	audioChannel.mutex.Lock()
+	audioChannel.clients[ws] = true
+	audioChannel.mutex.Unlock()
 
-	log.Println("Nuevo cliente conectado")
+	log.Println("Nuevo cliente conectado al canal de audio")
 
 	for {
-		_, message, err := ws.ReadMessage()
+		messageType, message, err := ws.ReadMessage()
 		if err != nil {
 			log.Printf("Error al leer mensaje: %v", err)
 			break
 		}
 
-		// Emitir el mensaje de audio a todos los demás clientes
-		err = broadcastMessage(ws, message)
-		if err != nil {
-			log.Printf("Error al emitir mensaje: %v", err)
-			break
+		// Dependiendo del tipo de mensaje, realizamos diferentes acciones
+		if messageType == websocket.TextMessage {
+			switch string(message) {
+			case "send":
+				log.Println("Cliente enviando audio")
+				// Mantener al cliente en modo de envío de audio
+				err = handleSend(ws)
+				if err != nil {
+					log.Printf("Error al enviar audio: %v", err)
+					break
+				}
+			case "listen":
+				log.Println("Cliente escuchando audio")
+				// Cliente está en modo escucha, no es necesario hacer nada específico aquí
+			}
 		}
 	}
 
-	// Remover el cliente de la lista de conexiones activas al desconectarse
-	clientsMutex.Lock()
-	delete(clients, ws)
-	clientsMutex.Unlock()
+	// Remover el cliente del canal de audio al desconectarse
+	audioChannel.mutex.Lock()
+	delete(audioChannel.clients, ws)
+	audioChannel.mutex.Unlock()
 
-	log.Println("Cliente desconectado")
+	log.Println("Cliente desconectado del canal de audio")
 }
 
-func broadcastMessage(sender *websocket.Conn, message []byte) error {
-	clientsMutex.Lock()
-	defer clientsMutex.Unlock()
+func handleSend(sender *websocket.Conn) error {
+	for {
+		// Leer mensaje binario (audio)
+		_, audioData, err := sender.ReadMessage()
+		if err != nil {
+			log.Printf("Error al leer datos de audio: %v", err)
+			return err
+		}
 
-	for client := range clients {
+		// Emitir el mensaje de audio a todos los demás clientes que están en modo "listen"
+		err = broadcastAudioMessage(sender, audioData)
+		if err != nil {
+			log.Printf("Error al emitir mensaje de audio: %v", err)
+			return err
+		}
+	}
+}
+
+func broadcastAudioMessage(sender *websocket.Conn, audioData []byte) error {
+	audioChannel.mutex.Lock()
+	defer audioChannel.mutex.Unlock()
+
+	for client := range audioChannel.clients {
 		if client != sender {
-			err := client.WriteMessage(websocket.BinaryMessage, message)
+			err := client.WriteMessage(websocket.BinaryMessage, audioData)
 			if err != nil {
 				log.Printf("Error al enviar mensaje: %v", err)
 				client.Close()
-				delete(clients, client)
+				delete(audioChannel.clients, client)
 			}
 		}
 	}
