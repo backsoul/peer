@@ -47,6 +47,8 @@ func main() {
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"}, // Permitir todas las solicitudes
 		AllowCredentials: true,
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders:   []string{"Origin", "Content-Type", "Accept"},
 	})
 
 	// Crear un servidor HTTP con CORS habilitado
