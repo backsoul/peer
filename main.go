@@ -22,9 +22,9 @@ func main() {
 
 	// Manejar el evento "audio"
 	server.OnEvent("/", "audio", func(s socketio.Conn, audioData []byte) {
+		// Aquí manejas los datos de audio recibidos
 		fmt.Println("Audio recibido del cliente:", s.ID())
-
-		// Emitir el audio recibido a todos los demás clientes
+		// Opcional: Procesar el audio o retransmitirlo a otros clientes
 		server.BroadcastToNamespace("/", "audio", audioData)
 	})
 
