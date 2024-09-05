@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -15,6 +16,10 @@ var upgrader = websocket.Upgrader{
 		return true
 	},
 }
+
+// Mapa para almacenar las conexiones de WebSocket
+var clients = make(map[*websocket.Conn]bool)
+var mu sync.Mutex // Mutex para evitar condiciones de carrera
 
 func main() {
 	http.HandleFunc("/ws", handleConnections)
@@ -36,6 +41,11 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
+	// Añadir el nuevo cliente al mapa
+	mu.Lock()
+	clients[ws] = true
+	mu.Unlock()
+
 	log.Println("Nuevo cliente conectado")
 
 	for {
@@ -46,16 +56,28 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		// Aquí puedes manejar el audio recibido, por ejemplo, retransmitirlo a otros clientes
+		// Aquí puedes manejar el audio recibido
 		log.Printf("Audio recibido: %d bytes", len(message))
 
-		// Enviar una respuesta al cliente si es necesario
-		err = ws.WriteMessage(websocket.BinaryMessage, message)
-		if err != nil {
-			log.Printf("Error al enviar mensaje: %v", err)
-			break
+		// Retransmitir el mensaje a todos los demás clientes conectados
+		mu.Lock()
+		for client := range clients {
+			if client != ws {
+				err := client.WriteMessage(websocket.BinaryMessage, message)
+				if err != nil {
+					log.Printf("Error al enviar mensaje a un cliente: %v", err)
+					client.Close()
+					delete(clients, client)
+				}
+			}
 		}
+		mu.Unlock()
 	}
+
+	// Eliminar al cliente cuando se desconecte
+	mu.Lock()
+	delete(clients, ws)
+	mu.Unlock()
 
 	log.Println("Cliente desconectado")
 }
