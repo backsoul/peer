@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	speech "cloud.google.com/go/speech/apiv1"
 	"github.com/gorilla/websocket"
@@ -40,7 +42,7 @@ func main() {
 	}
 }
 
-// WebSocket para enviar audio, retransmitirlo y convertirlo a texto
+// WebSocket para enviar audio en tiempo real y procesar segmentos de 5 segundos para convertirlos a texto
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 	// Actualizar la conexión HTTP a una conexión WebSocket
 	ws, err := upgrader.Upgrade(w, r, nil)
@@ -57,6 +59,41 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Nuevo cliente conectado para envío de audio")
 
+	var audioBuffer bytes.Buffer
+	ticker := time.NewTicker(5 * time.Second)
+
+	go func() {
+		for range ticker.C {
+			if audioBuffer.Len() > 0 {
+				audioData := audioBuffer.Bytes()
+
+				// Convertir el audio acumulado a texto
+				go func(audio []byte) {
+					text, err := convertSpeechToText(audio)
+					if err != nil {
+						log.Printf("Error al convertir audio a texto: %v", err)
+						return
+					}
+
+					// Enviar el texto a los clientes conectados a /ws-speech
+					mu.Lock()
+					for client := range speechClients {
+						err := client.WriteMessage(websocket.TextMessage, []byte(text))
+						if err != nil {
+							log.Printf("Error al enviar texto a un cliente: %v", err)
+							client.Close()
+							delete(speechClients, client)
+						}
+					}
+					mu.Unlock()
+				}(audioData)
+
+				// Limpiar el buffer para el siguiente periodo de 5 segundos
+				audioBuffer.Reset()
+			}
+		}
+	}()
+
 	for {
 		// Leer el mensaje de audio desde el cliente
 		_, audioData, err := ws.ReadMessage()
@@ -65,7 +102,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		// Retransmitir el audio a los demás clientes conectados a /ws
+		// Enviar el audio en tiempo real a los demás clientes conectados a /ws
 		mu.Lock()
 		for client := range audioClients {
 			if client != ws { // Evitar enviar el audio de vuelta al mismo cliente
@@ -79,26 +116,8 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 		mu.Unlock()
 
-		// Convertir el audio a texto
-		go func(audio []byte) {
-			text, err := convertSpeechToText(audio)
-			if err != nil {
-				log.Printf("Error al convertir audio a texto: %v", err)
-				return
-			}
-
-			// Enviar el texto a los clientes conectados a /ws-speech
-			mu.Lock()
-			for client := range speechClients {
-				err := client.WriteMessage(websocket.TextMessage, []byte(text))
-				if err != nil {
-					log.Printf("Error al enviar texto a un cliente: %v", err)
-					client.Close()
-					delete(speechClients, client)
-				}
-			}
-			mu.Unlock()
-		}(audioData) // Ejecutar en goroutine para no bloquear la retransmisión del audio
+		// Acumular el audio recibido en el buffer para la transcripción
+		audioBuffer.Write(audioData)
 	}
 
 	// Eliminar al cliente cuando se desconecte
