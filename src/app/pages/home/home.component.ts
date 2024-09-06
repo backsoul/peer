@@ -139,26 +139,25 @@ export class HomeComponent {
   startRecording() {
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(stream => {
-        this.mediaRecorder = new MediaRecorder(stream);
+        this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=pcm' });
         this.mediaRecorder.ondataavailable = (event) => {
-          this.audioChunks.push(event.data);
-          if (this.socket && this.socket.readyState === WebSocket.OPEN && this.micStatus && this.mediaRecorder?.state === 'recording') {
-            // Asegúrate de que solo se envíen datos mientras el mediaRecorder está grabando
-            const reader = new FileReader();
-            reader.readAsArrayBuffer(event.data);
-            reader.onloadend = () => {
-              const pcmData = new Uint8Array(reader.result as ArrayBuffer);
-              const wavData = this.addWavHeader(pcmData, 44100, 1, 16);
+          if (this.socket && this.socket.readyState === WebSocket.OPEN && this.micStatus) {
+            event.data.arrayBuffer().then((buffer) => {
+              const pcmData = new Uint8Array(buffer);
+              const wavData = this.addWavHeader(pcmData, 44100, 1, 16); // Frecuencia de 44100 Hz
               this.socket?.send(wavData);
-            };
+            }).catch(error => {
+              console.error("Error converting blob to arrayBuffer:", error);
+            });
           }
         };
-        this.mediaRecorder.start(250);  // Envía audio cada 250 ms
+        this.mediaRecorder.start(250);  // Envía cada 250 ms
       })
       .catch(error => {
         console.error("Error accessing microphone:", error);
       });
   }
+  
   
   stopRecording() {
     if (this.mediaRecorder) {
