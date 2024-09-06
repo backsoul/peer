@@ -153,7 +153,7 @@ func convertSpeechToText(audioData []byte) (string, error) {
 	req := &speechpb.RecognizeRequest{
 		Config: &speechpb.RecognitionConfig{
 			Encoding:        speechpb.RecognitionConfig_LINEAR16,
-			SampleRateHertz: 16000,
+			SampleRateHertz: 44100,
 			LanguageCode:    "es-ES", // Cambia esto al idioma que necesites
 		},
 		Audio: &speechpb.RecognitionAudio{
