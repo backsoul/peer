@@ -14,7 +14,7 @@ export class HomeComponent {
   public listText: string[] = [];
   private socket: WebSocket | undefined;
   private socketSpeech: WebSocket | undefined;
-  private mediaRecorder: MediaRecorder | undefined;
+  private mediaRecorder: any;
   private audioChunks: Blob[] = [];
   private audioContext: AudioContext | undefined;
   private source: AudioBufferSourceNode | undefined;
@@ -139,24 +139,42 @@ export class HomeComponent {
   startRecording() {
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(stream => {
-        this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=pcm' });
-        this.mediaRecorder.ondataavailable = (event) => {
-          if (this.socket && this.socket.readyState === WebSocket.OPEN && this.micStatus) {
-            event.data.arrayBuffer().then((buffer) => {
-              const pcmData = new Uint8Array(buffer);
-              const wavData = this.addWavHeader(pcmData, 44100, 1, 16); // Frecuencia de 44100 Hz
-              this.socket?.send(wavData);
-            }).catch(error => {
-              console.error("Error converting blob to arrayBuffer:", error);
-            });
+        const audioContext = new AudioContext();
+        const mediaStreamSource = audioContext.createMediaStreamSource(stream);
+        const processor = audioContext.createScriptProcessor(4096, 1, 1); // Tamaño del buffer
+  
+        // Procesador de audio para obtener los datos en PCM
+        processor.onaudioprocess = (audioEvent) => {
+          if (this.micStatus && this.socket && this.socket.readyState === WebSocket.OPEN) {
+            const inputBuffer = audioEvent.inputBuffer;
+            const pcmData = this.convertToPCM(inputBuffer);
+            const wavData = this.addWavHeader(pcmData, 44100, 1, 16); // Agrega el encabezado WAV
+            this.socket.send(wavData); // Envía los datos al WebSocket
           }
         };
-        this.mediaRecorder.start(250);  // Envía cada 250 ms
+  
+        mediaStreamSource.connect(processor);
+        processor.connect(audioContext.destination);
+        this.mediaRecorder = mediaStreamSource;  // Guarda la referencia para detenerla luego
       })
       .catch(error => {
         console.error("Error accessing microphone:", error);
       });
   }
+  
+  // Convertir los datos del AudioBuffer a PCM
+  convertToPCM(inputBuffer: AudioBuffer): Uint8Array {
+    const inputData = inputBuffer.getChannelData(0); // Obtener solo el primer canal (mono)
+    const pcmData = new Uint8Array(inputData.length * 2); // 16-bit PCM
+    for (let i = 0; i < inputData.length; i++) {
+      const sample = Math.max(-1, Math.min(1, inputData[i])); // Limitar entre -1 y 1
+      const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF; // Escalar el sample a 16-bit
+      pcmData[i * 2] = intSample & 0xFF; // Byte menos significativo
+      pcmData[i * 2 + 1] = (intSample >> 8) & 0xFF; // Byte más significativo
+    }
+    return pcmData;
+  }
+  
   
   
   stopRecording() {
