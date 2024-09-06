@@ -42,6 +42,20 @@ func main() {
 	}
 }
 
+// Función para verificar si el audio contiene voz (si hay amplitud suficiente)
+func containsVoice(audioData []byte) bool {
+	// Calcular la amplitud promedio del audio
+	var sum int64
+	for _, b := range audioData {
+		sum += int64(b)
+	}
+	avg := sum / int64(len(audioData))
+
+	// Establecer un umbral de amplitud para considerar que hay "voz"
+	threshold := int64(50) // Puedes ajustar este valor
+	return avg > threshold
+}
+
 // WebSocket para enviar audio en tiempo real y procesar segmentos de 5 segundos para convertirlos a texto
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 	// Actualizar la conexión HTTP a una conexión WebSocket
@@ -67,26 +81,31 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			if audioBuffer.Len() > 0 {
 				audioData := audioBuffer.Bytes()
 
-				// Convertir el audio acumulado a texto
-				go func(audio []byte) {
-					text, err := convertSpeechToText(audio)
-					if err != nil {
-						log.Printf("Error al convertir audio a texto: %v", err)
-						return
-					}
-
-					// Enviar el texto a los clientes conectados a /ws-speech
-					mu.Lock()
-					for client := range speechClients {
-						err := client.WriteMessage(websocket.TextMessage, []byte(text))
+				// Verificar si el audio tiene suficiente actividad de voz antes de enviarlo a Google
+				if containsVoice(audioData) {
+					// Convertir el audio acumulado a texto
+					go func(audio []byte) {
+						text, err := convertSpeechToText(audio)
 						if err != nil {
-							log.Printf("Error al enviar texto a un cliente: %v", err)
-							client.Close()
-							delete(speechClients, client)
+							log.Printf("Error al convertir audio a texto: %v", err)
+							return
 						}
-					}
-					mu.Unlock()
-				}(audioData)
+
+						// Enviar el texto a los clientes conectados a /ws-speech
+						mu.Lock()
+						for client := range speechClients {
+							err := client.WriteMessage(websocket.TextMessage, []byte(text))
+							if err != nil {
+								log.Printf("Error al enviar texto a un cliente: %v", err)
+								client.Close()
+								delete(speechClients, client)
+							}
+						}
+						mu.Unlock()
+					}(audioData)
+				} else {
+					log.Println("No se detectó voz en el audio.")
+				}
 
 				// Limpiar el buffer para el siguiente periodo de 5 segundos
 				audioBuffer.Reset()
