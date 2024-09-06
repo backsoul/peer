@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ElementRef, ViewChild } from '@angular/core';
 
 @Component({
   selector: 'app-home',
@@ -10,22 +10,38 @@ export class HomeComponent {
   public speakerStatus: boolean = false;
   public connection: boolean = false;
   public urlWS: string = "wss://walkie.lumisar.com/ws";
+  public urlWSSpeech: string = "wss://walkie.lumisar.com/ws-speech";
+  public listText: string[] = [];
   private socket: WebSocket | undefined;
+  private socketSpeech: WebSocket | undefined;
   private mediaRecorder: MediaRecorder | undefined;
   private audioChunks: Blob[] = [];
   private audioContext: AudioContext | undefined;
   private source: AudioBufferSourceNode | undefined;
   private audioQueue: Array<Uint8Array> = [];  // Cola de audio en espera
   private isPlaying: boolean = false;  // Indicador si está reproduciendo audio
+  @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
-  constructor() {}
+  constructor() {
+  }
 
+  ngAfterViewChecked() {
+    this.scrollToBottom(); // Asegúrate de desplazarte al final después de cada cambio
+  }
   changeMicStatus() {
     this.micStatus = !this.micStatus;
     if (this.micStatus) {
       this.startRecording();
     } else {
       this.stopRecording();
+    }
+  }
+
+  private scrollToBottom(): void {
+    try {
+      this.scrollContainer.nativeElement.scrollTop = this.scrollContainer.nativeElement.scrollHeight;
+    } catch (err) {
+      console.error('Error scrolling to bottom:', err);
     }
   }
 
@@ -68,7 +84,6 @@ export class HomeComponent {
   openConnection() {
     this.connection = true;
     this.socket = new WebSocket(this.urlWS);
-
     this.socket.onopen = () => {
       console.log("[open] Conexión establecida");
     };
@@ -92,6 +107,31 @@ export class HomeComponent {
     };
 
     this.socket.onerror = (error) => {
+      console.log(`[error]`);
+    };
+
+    this.socketSpeech = new WebSocket(this.urlWSSpeech); 
+
+    this.socketSpeech.onopen = () => {
+      console.log("[open] Conexión establecida");
+    };
+
+    this.socketSpeech.onmessage = (event) => {
+      if (typeof event.data === 'string') {
+        this.listText.push(event.data);
+      } 
+    };
+
+    this.socketSpeech.onclose = (event) => {
+      if (event.wasClean) {
+        console.log(`[close] Conexión cerrada limpiamente, código=${event.code} motivo=${event.reason}`);
+      } else {
+        console.log('[close] La conexión se cayó');
+      }
+      this.connection = false;
+    };
+
+    this.socketSpeech.onerror = (error) => {
       console.log(`[error]`);
     };
   }

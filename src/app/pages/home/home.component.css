@@ -33,3 +33,13 @@
             color: white;    box-shadow:4px 6px 0px 1px #851726;
             border: 3px solid #C5283D;
 }
+/* Estilo para navegadores basados en WebKit (Chrome, Safari) */
+.scrollContainer {
+    overflow-y: scroll;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+}
+.scrollContainer::-webkit-scrollbar { /* WebKit */
+    width: 0;
+    height: 0;
+}

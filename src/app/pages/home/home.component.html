@@ -20,46 +20,75 @@ border-radius: 16px;
 box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
 backdrop-filter: blur(8.2px);
 -webkit-backdrop-filter: blur(8.2px);">
-        <div style="display: flex;
-    justify-content: space-between;    height: 100%;">
-            <div style="width: 6rem;
-                height: 6rem;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            gap: .3rem;
-           
-            border-radius: 1rem;
-            padding: 1rem 0rem;
-            " class="client-container">
-                <h1 style="    color: white;
-        font-weight: 600;">BOB</h1>
-                <svg  class="w-6 h-6 text-gray-800 text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-                    <path fill-rule="evenodd" d="M5 8a1 1 0 0 1 1 1v3a4.006 4.006 0 0 0 4 4h4a4.006 4.006 0 0 0 4-4V9a1 1 0 1 1 2 0v3.001A6.006 6.006 0 0 1 14.001 18H13v2h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2H9.999A6.006 6.006 0 0 1 4 12.001V9a1 1 0 0 1 1-1Z" clip-rule="evenodd"/>
-                    <path d="M7 6a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v5a4 4 0 0 1-4 4h-2a4 4 0 0 1-4-4V6Z"/>
-                  </svg>    
-            </div>
-            <div style="    
-            padding: 1rem;
-            border-radius: 1rem;
-            height: fit-content;
-            "     [ngClass]="{'bg-connection': connection , 'bg-close' : !connection}">
-                <h1 style="    font-weight: 600;
-                margin-bottom: .5rem;
-                font-size: 1rem;">Sala #12371932</h1>
-                <div style="display: flex;flex-direction: row; gap: 1rem; justify-content: center; align-items: center;">
-                    <input type="text" [(ngModel)]="urlWS" name="url" id="" placeholder="room url" style="border-radius: 1rem;color: black;border: 0px;" *ngIf="!connection">
-                    <h2 *ngIf="connection">Conectado</h2>
-                    <svg *ngIf="!connection" (click)="openConnection()"  style="background-color:  #00D9C0;" class="w-8 h-8 text-white rounded-sm p-1 cursor-pointer" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.213 9.787a3.391 3.391 0 0 0-4.795 0l-3.425 3.426a3.39 3.39 0 0 0 4.795 4.794l.321-.304m-.321-4.49a3.39 3.39 0 0 0 4.795 0l3.424-3.426a3.39 3.39 0 0 0-4.794-4.795l-1.028.961"/>
-                      </svg>
-                      <svg *ngIf="connection" (click)="closeConnection()" class="w-8 h-8 bg-red-800 text-white rounded-sm p-1 cursor-pointer" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/>
-                      </svg>
+        <div style="height: 100%;width: 100%;" class="grid grid-cols-8">
+    <div style="width: 100%;" class="col-span-6">
+        <div style="width: 6rem;
+            height: 6rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: .3rem;
+       
+        border-radius: 1rem;
+        padding: 1rem 0rem;
+        " class="client-container">
+            <h1 style="    color: white;
+    font-weight: 600;">BOB</h1>
+            <svg  class="w-6 h-6 text-gray-800 text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+                <path fill-rule="evenodd" d="M5 8a1 1 0 0 1 1 1v3a4.006 4.006 0 0 0 4 4h4a4.006 4.006 0 0 0 4-4V9a1 1 0 1 1 2 0v3.001A6.006 6.006 0 0 1 14.001 18H13v2h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2H9.999A6.006 6.006 0 0 1 4 12.001V9a1 1 0 0 1 1-1Z" clip-rule="evenodd"/>
+                <path d="M7 6a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v5a4 4 0 0 1-4 4h-2a4 4 0 0 1-4-4V6Z"/>
+              </svg>    
+        </div>
+    </div>
+
+
+            <div style="    height: 100%; width: 100%;" class="col-span-2">
+                <div style="    
+                padding: 1rem;
+                border-radius: 1rem;
+                height: fit-content;
+                "     [ngClass]="{'bg-connection': connection , 'bg-close' : !connection}">
+                    <h1 style="    font-weight: 600;
+                    margin-bottom: .5rem;
+                    font-size: 1rem;">Sala #12371932</h1>
+                    <div style="display: flex;flex-direction: row; gap: 1rem; justify-content: center; align-items: center;">
+                        <input type="text" [(ngModel)]="urlWS" name="url" id="" placeholder="room url" style="border-radius: 1rem;color: black;border: 0px;" *ngIf="!connection">
+                        <h2 *ngIf="connection">Conectado</h2>
+                        <div style="width: 100%;">
+                            <svg *ngIf="!connection" (click)="openConnection()"  style="background-color:  #00D9C0;" class="w-8 h-8 text-white rounded-sm p-1 cursor-pointer" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.213 9.787a3.391 3.391 0 0 0-4.795 0l-3.425 3.426a3.39 3.39 0 0 0 4.795 4.794l.321-.304m-.321-4.49a3.39 3.39 0 0 0 4.795 0l3.424-3.426a3.39 3.39 0 0 0-4.794-4.795l-1.028.961"/>
+                              </svg>
+                              <svg *ngIf="connection" (click)="closeConnection()" class="w-8 h-8 bg-red-800 text-white rounded-sm p-1 cursor-pointer" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/>
+                              </svg>
+                        </div>
+                    </div>
+                                        
                 </div>
-                                    
-            </div>  
+                
+                <div #scrollContainer class="scrollContainer" style="    margin: 1rem;
+                background: white;
+                height: fit-content;
+                position: relative;
+                border-radius: 1rem;
+                padding: 1rem;    overflow-y: scroll;
+                max-height: 80%;" *ngIf="listText.length">
+                     <ul  *ngFor="let text of listText">
+                        <div>
+                        <p style="    font-weight: 600;
+                        font-family: unset;
+                        text-decoration: solid;">conversacion</p>
+                        <li style="font-weight: 400;
+                        font-family: system-ui;
+                        color: #3a3737;">{{text}}</li>
+                        </div>
+                        <div style="    height: 1px;
+                        background: #cfcfcf;
+                        margin: .5rem 0rem;"></div>
+                    </ul>
+                </div>
+            </div>
         </div>
     </div>
 </div>
