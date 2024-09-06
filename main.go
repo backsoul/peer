@@ -60,7 +60,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	log.Println("Nuevo cliente conectado para envío de audio")
 
 	var audioBuffer bytes.Buffer
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 
 	go func() {
 		for range ticker.C {
