@@ -7,6 +7,12 @@ WORKDIR /app
 # Copiar los archivos de la aplicación al contenedor
 COPY . .
 
+# Copiar el archivo de credenciales al contenedor
+COPY credentials.json /app/credentials.json
+
+# Definir la variable de entorno para las credenciales
+ENV GOOGLE_APPLICATION_CREDENTIALS="/app/credentials.json"
+
 # Descargar las dependencias
 RUN go mod download
 
@@ -21,6 +27,12 @@ WORKDIR /root/
 
 # Copiar el binario desde la imagen de construcción
 COPY --from=builder /app/server .
+
+# Copiar el archivo de credenciales a la imagen final
+COPY --from=builder /app/credentials.json .
+
+# Definir la variable de entorno para las credenciales en la imagen de producción
+ENV GOOGLE_APPLICATION_CREDENTIALS="/root/credentials.json"
 
 # Exponer el puerto en el que corre el servidor
 EXPOSE 3000

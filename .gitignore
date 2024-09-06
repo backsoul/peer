@@ -8,7 +8,7 @@ walkie/dist
 walkie/tmp
 walkie/out-tsc
 walkie/bazel-out
-
+credentials.json
 # Node
 walkie/node_modules
 walkie/npm-debug.log
