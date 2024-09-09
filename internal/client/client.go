@@ -102,34 +102,42 @@ func HandleSpeechProcessing(w http.ResponseWriter, r *http.Request) {
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			if len(audioBuffer) > 1024 { // Asegurarse de tener suficiente audio
-				go processAudioFragment(ws, audioBuffer)
-				audioBuffer = nil // Limpiar el buffer después de procesarlo
-			} else {
-				log.Println("Audio insuficiente para procesar")
-			}
-		default:
+	go func() {
+		for {
 			_, audioData, err := ws.ReadMessage()
 			if err != nil {
 				log.Printf("Error al recibir audio para transcripción: %v", err)
 				break
 			}
-			audioBuffer = append(audioBuffer, audioData...) // Acumular audio
+			// Acumula el audio a medida que lo recibe
+			audioBuffer = append(audioBuffer, audioData...)
+		}
+	}()
+
+	for {
+		select {
+		case <-ticker.C:
+			// Procesar el buffer de audio cada 3 segundos
+			go processAudioFragment(ws, &audioBuffer)
 		}
 	}
 }
 
-func processAudioFragment(ws *websocket.Conn, audio []byte) {
-	if len(audio) == 0 {
-		log.Println("No hay audio para procesar")
+func processAudioFragment(ws *websocket.Conn, audioBuffer *[]byte) {
+	// Copia el contenido del buffer actual
+	audioData := make([]byte, len(*audioBuffer))
+	copy(audioData, *audioBuffer)
+
+	// Limpiar el buffer original para los próximos datos
+	*audioBuffer = nil
+
+	if len(audioData) == 0 {
+		log.Println("No hay audio suficiente para procesar")
 		return
 	}
 
 	// Enviar el audio acumulado al servicio de transcripción
-	text, err := speech.StreamAudioToText(bytes.NewReader(audio))
+	text, err := speech.StreamAudioToText(bytes.NewReader(audioData))
 	if err != nil {
 		log.Printf("Error al convertir audio a texto: %v", err)
 		return
