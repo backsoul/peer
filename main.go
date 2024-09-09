@@ -16,7 +16,11 @@ func main() {
 	fmt.Printf("Servidor WebRTC corriendo en https://localhost%s\n", port)
 
 	// Servir usando TLS
-	err := http.ListenAndServeTLS(":3000", "localhost.crt", "localhost.key", nil)
+	// err := http.ListenAndServeTLS(":3000", "localhost.crt", "localhost.key", nil)
+	// if err != nil {
+	// 	log.Fatalf("Error al iniciar el servidor: %v", err)
+	// }
+	err := http.ListenAndServe(port, nil)
 	if err != nil {
 		log.Fatalf("Error al iniciar el servidor: %v", err)
 	}
