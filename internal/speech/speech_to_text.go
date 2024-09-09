@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"time"
 
 	speech "cloud.google.com/go/speech/apiv1"
@@ -14,18 +13,22 @@ import (
 // Función para transmitir el audio usando la API de Streaming de Google
 func StreamAudioToText(audioStream io.Reader) (string, error) {
 	ctx := context.Background()
+
+	// Crear cliente de Google Speech
 	client, err := speech.NewClient(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error al crear cliente de Google Speech: %v", err)
 	}
 	defer client.Close()
 
+	// Iniciar el stream de reconocimiento
 	stream, err := client.StreamingRecognize(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error al iniciar transmisión: %v", err)
 	}
 	defer stream.CloseSend()
 
+	// Configuración inicial de reconocimiento
 	req := &speechpb.StreamingRecognizeRequest{
 		StreamingRequest: &speechpb.StreamingRecognizeRequest_StreamingConfig{
 			StreamingConfig: &speechpb.StreamingRecognitionConfig{
@@ -34,7 +37,7 @@ func StreamAudioToText(audioStream io.Reader) (string, error) {
 					SampleRateHertz: 44100,
 					LanguageCode:    "es-ES", // Cambia el código de idioma según lo necesario
 				},
-				InterimResults: true, // Permite obtener resultados intermedios si es necesario
+				InterimResults: true, // Permitir resultados intermedios
 			},
 		},
 	}
@@ -43,21 +46,27 @@ func StreamAudioToText(audioStream io.Reader) (string, error) {
 		return "", fmt.Errorf("error al enviar configuración: %v", err)
 	}
 
-	// Goroutine para recibir respuestas
-	var transcript string
+	// Canal para sincronizar las respuestas
+	transcriptChan := make(chan string)
+	errChan := make(chan error)
+
+	// Goroutine para recibir las respuestas en paralelo
 	go func() {
 		for {
 			resp, err := stream.Recv()
 			if err == io.EOF {
-				break
+				close(transcriptChan) // Cerrar el canal al final del stream
+				return
 			}
 			if err != nil {
-				log.Printf("error al recibir la respuesta: %v", err)
-				break
+				errChan <- fmt.Errorf("error al recibir la respuesta: %v", err)
+				return
 			}
+
 			for _, result := range resp.Results {
-				transcript = result.Alternatives[0].Transcript
-				log.Printf("Transcripción: %s\n", transcript)
+				if len(result.Alternatives) > 0 {
+					transcriptChan <- result.Alternatives[0].Transcript
+				}
 			}
 		}
 	}()
@@ -83,8 +92,22 @@ func StreamAudioToText(audioStream io.Reader) (string, error) {
 			return "", fmt.Errorf("error al enviar audio: %v", err)
 		}
 
-		time.Sleep(100 * time.Millisecond) // Simula latencia de red
+		// Esperar por un fragmento corto para permitir un envío fluido
+		time.Sleep(10 * time.Millisecond)
 	}
 
-	return transcript, nil
+	// Esperar por el cierre del stream y recoger la transcripción
+	var finalTranscript string
+	for {
+		select {
+		case transcript, ok := <-transcriptChan:
+			if !ok {
+				// Canal cerrado, terminamos
+				return finalTranscript, nil
+			}
+			finalTranscript += transcript + " "
+		case err := <-errChan:
+			return "", err
+		}
+	}
 }
