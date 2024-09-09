@@ -16,8 +16,10 @@ func main() {
 	// http.HandleFunc("/ws-speech", client.HandleSpeechProcessing)
 
 	port := ":3000"
-	fmt.Printf("Servidor de WebSocket corriendo en http://localhost%s\n", port)
-	err := http.ListenAndServe(port, nil)
+	fmt.Printf("Servidor de WebSocket corriendo en https://localhost%s\n", port)
+
+	// Servir usando TLS
+	err := http.ListenAndServeTLS(port, "cert.pem", "key.pem", nil)
 	if err != nil {
 		log.Fatalf("Error al iniciar el servidor: %v", err)
 	}
