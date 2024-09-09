@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/backsoul/walkie/internal/speech"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -20,6 +21,7 @@ var upgrader = websocket.Upgrader{
 var audioClients = make(map[*websocket.Conn]bool)
 var speechClients = make(map[*websocket.Conn]bool)
 var mu sync.Mutex
+var clients = make(map[string]*websocket.Conn) // Mapa para gestionar los clientes por su ID único
 
 // WebSocket para enviar audio en tiempo real y procesar segmentos para convertirlos a texto
 func HandleConnections(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +33,9 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 	defer ws.Close()
 
 	mu.Lock()
+	clientID := generateClientID()
 	audioClients[ws] = true
+	clients[clientID] = ws
 	mu.Unlock()
 
 	log.Println("Nuevo cliente conectado para envío de audio")
@@ -138,4 +142,8 @@ func containsVoice(audioData []byte) bool {
 	// Umbral para determinar si hay voz
 	threshold := int64(50) // Puedes ajustar este valor según sea necesario
 	return avg > threshold
+}
+
+func generateClientID() string {
+	return uuid.New().String()
 }
