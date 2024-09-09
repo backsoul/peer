@@ -133,12 +133,14 @@ func processAudioFragment(ws *websocket.Conn, audio []byte) {
 		return
 	}
 
+	// Enviar el audio acumulado al servicio de transcripción
 	text, err := speech.StreamAudioToText(bytes.NewReader(audio))
 	if err != nil {
 		log.Printf("Error al convertir audio a texto: %v", err)
 		return
 	}
 
+	// Enviar el texto transcrito al cliente en formato de texto
 	err = ws.WriteMessage(websocket.TextMessage, []byte(text))
 	if err != nil {
 		log.Printf("Error al enviar texto: %v", err)
