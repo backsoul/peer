@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/backsoul/walkie/internal/client"
 )
@@ -12,8 +13,8 @@ func main() {
 	// WebSocket para enviar audio y retransmitirlo
 	http.HandleFunc("/ws", client.HandleAudioConnections)
 
-	// WebSocket para recibir y procesar el audio a texto
-	// http.HandleFunc("/ws-speech", client.HandleSpeechProcessing)
+	// Limpieza de mensajes pendientes cada 10 segundos
+	go client.CleanUpOldMessages(10 * time.Second)
 
 	port := ":3000"
 	fmt.Printf("Servidor de WebSocket corriendo en https://localhost%s\n", port)

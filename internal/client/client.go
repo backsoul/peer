@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -46,8 +47,12 @@ func HandleAudioConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
+		// Agregar timestamp al mensaje
+		timestamp := time.Now().Format(time.RFC3339)
+		messageWithTimestamp := append([]byte(timestamp+"|"), message...)
+
 		// Retransmitir el mensaje a todos los demás clientes
-		broadcastAudio(messageType, message, ws)
+		broadcastAudio(messageType, messageWithTimestamp, ws)
 	}
 }
 
@@ -66,5 +71,23 @@ func broadcastAudio(messageType int, message []byte, sender *websocket.Conn) {
 				delete(audioClients, client)
 			}
 		}
+	}
+}
+
+// Limpiar los clientes desconectados y mensajes pendientes cada intervalo de tiempo
+func CleanUpOldMessages(interval time.Duration) {
+	for {
+		time.Sleep(interval)
+
+		mu.Lock()
+		for client := range audioClients {
+			if err := client.WriteMessage(websocket.PingMessage, nil); err != nil {
+				log.Printf("Cliente desconectado: %v", err)
+				client.Close()
+				delete(audioClients, client)
+			}
+		}
+		mu.Unlock()
+		log.Println("Limpieza de mensajes pendientes realizada")
 	}
 }
