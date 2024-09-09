@@ -13,7 +13,7 @@ func main() {
 	http.HandleFunc("/ws", client.HandleAudioConnections)
 
 	// WebSocket para recibir y procesar el audio a texto
-	http.HandleFunc("/ws-speech", client.HandleSpeechProcessing)
+	// http.HandleFunc("/ws-speech", client.HandleSpeechProcessing)
 
 	port := ":3000"
 	fmt.Printf("Servidor de WebSocket corriendo en http://localhost%s\n", port)
