@@ -1,60 +1,52 @@
 package speech
 
 import (
-	"bytes"
 	"context"
-	"fmt"
-	"io"
+	"log"
 
 	speech "cloud.google.com/go/speech/apiv1"
 	"cloud.google.com/go/speech/apiv1/speechpb"
 )
 
-func StreamAudioToText(audioStream io.Reader) (string, error) {
+// ConvertAudioToText convierte el audio a texto utilizando Google Speech-to-Text
+func ConvertAudioToText(audioData []byte) string {
+	// Crear el cliente de Google Speech-to-Text
 	ctx := context.Background()
 	client, err := speech.NewClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("Error al crear el cliente de Speech-to-Text: %v", err)
+		log.Fatalf("Error al crear el cliente de Google Speech: %v", err)
+		return ""
 	}
 	defer client.Close()
 
-	// Convierte el stream de audio a bytes
-	audioBytes := audioStreamToBytes(audioStream)
-
-	// Configura la solicitud de reconocimiento de audio
+	// Configurar la solicitud
 	req := &speechpb.RecognizeRequest{
 		Config: &speechpb.RecognitionConfig{
 			Encoding:        speechpb.RecognitionConfig_LINEAR16,
-			SampleRateHertz: 44100,
-			LanguageCode:    "es-ES",
+			SampleRateHertz: 44100,   // Debes ajustar esto según la tasa de muestreo de tu audio
+			LanguageCode:    "es-ES", // Idioma español, puedes cambiarlo a otros códigos de idioma si es necesario
 		},
 		Audio: &speechpb.RecognitionAudio{
 			AudioSource: &speechpb.RecognitionAudio_Content{
-				Content: audioBytes,
+				Content: audioData, // El contenido de tu audio
 			},
 		},
 	}
 
-	// Envía la solicitud y procesa la respuesta
+	// Enviar la solicitud de reconocimiento de audio
 	resp, err := client.Recognize(ctx, req)
 	if err != nil {
-		return "", fmt.Errorf("Error al procesar la transcripción de audio: %v", err)
+		log.Fatalf("Error al procesar el audio con Google Speech: %v", err)
+		return ""
 	}
 
-	// Itera sobre los resultados y combina el texto transcrito
+	// Procesar la respuesta
 	var resultText string
 	for _, result := range resp.Results {
 		for _, alt := range result.Alternatives {
-			resultText += alt.Transcript + " "
+			resultText += alt.Transcript
 		}
 	}
 
-	return resultText, nil
-}
-
-// Convierte el io.Reader (audioStream) a bytes
-func audioStreamToBytes(audioStream io.Reader) []byte {
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(audioStream)
-	return buf.Bytes()
+	return resultText
 }

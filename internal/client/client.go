@@ -4,19 +4,24 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
+	"github.com/backsoul/walkie/internal/speech"
 	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Permitir todas las solicitudes CORS
-	},
-}
+var (
+	upgrader      = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	audioClients  = make(map[*websocket.Conn]chan []byte)
+	speechClients = make(map[*websocket.Conn]bool)
+	mu            sync.Mutex
+)
 
-var audioClients = make(map[*websocket.Conn]chan []byte)
-var speechClients = make(map[*websocket.Conn]bool)
-var mu sync.Mutex
+// Buffer de audio y temporizador para fragmentar audio cada 5 segundos
+var (
+	audioBuffer      []byte
+	fragmentDuration = 5 * time.Second
+)
 
 // WebSocket para enviar audio en tiempo real
 func HandleAudioConnections(w http.ResponseWriter, r *http.Request) {
@@ -53,8 +58,10 @@ func HandleAudioConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		// Enviar el audio a /ws-speech para procesar y convertir a texto
-		go HandleSpeechProcessingAudio(audioData)
+		// Acumular audio en el buffer
+		mu.Lock()
+		audioBuffer = append(audioBuffer, audioData...)
+		mu.Unlock()
 
 		// Transmitir el audio a los demás clientes conectados
 		go func(audio []byte) {
@@ -80,15 +87,36 @@ func HandleAudioConnections(w http.ResponseWriter, r *http.Request) {
 	log.Println("Cliente desconectado del envío de audio")
 }
 
+// Fragmentar audio cada 5 segundos y procesarlo
+func StartAudioFragmenter() {
+	ticker := time.NewTicker(fragmentDuration)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		mu.Lock()
+		if len(audioBuffer) > 0 {
+			// Extraer y procesar el fragmento
+			fragment := audioBuffer
+			audioBuffer = nil // Reiniciar el buffer
+			mu.Unlock()
+
+			// Procesar el fragmento de audio
+			go HandleSpeechProcessingAudio(fragment)
+		} else {
+			mu.Unlock()
+		}
+	}
+}
+
 // Procesar audio y convertirlo a texto
 func HandleSpeechProcessingAudio(audioData []byte) {
+	// Aquí se realiza la conversión del audio a texto
+	text := speech.ConvertAudioToText(audioData) // Llamar al servicio de Google Speech-to-Text
+
+	// Enviar el texto a los clientes conectados a /ws-speech
 	mu.Lock()
 	defer mu.Unlock()
 	for client := range speechClients {
-		// Aquí se realiza la conversión del audio a texto
-		text := ConvertAudioToText(audioData) // Función ficticia, debe implementarse
-
-		// Enviar el texto a los clientes conectados a /ws-speech
 		err := client.WriteMessage(websocket.TextMessage, []byte(text))
 		if err != nil {
 			log.Printf("Error al enviar texto a cliente: %v", err)
@@ -126,11 +154,4 @@ func HandleSpeechProcessing(w http.ResponseWriter, r *http.Request) {
 	mu.Unlock()
 
 	log.Println("Cliente desconectado de procesamiento de audio a texto")
-}
-
-// Esta función debe implementar el procesamiento de audio a texto (ej. usando Google Speech-to-Text)
-func ConvertAudioToText(audioData []byte) string {
-	// Aquí va la lógica para convertir el audio en texto
-	// Puedes usar algún servicio como Google Speech-to-Text
-	return "Texto procesado"
 }
