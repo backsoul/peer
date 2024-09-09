@@ -143,16 +143,17 @@ export class HomeComponent {
   startRecording() {
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(stream => {
-        const audioContext = new AudioContext();
+        const sampleRate = 16000; // Reducir la frecuencia de muestreo
+        const audioContext = new AudioContext({ sampleRate: sampleRate });
         const mediaStreamSource = audioContext.createMediaStreamSource(stream);
-        const processor = audioContext.createScriptProcessor(4096, 1, 1); // Tamaño del buffer
+        const processor = audioContext.createScriptProcessor(2048, 1, 1); // Reducir el tamaño del buffer
   
         // Procesador de audio para obtener los datos en PCM
         processor.onaudioprocess = (audioEvent) => {
           if (this.micStatus && this.socket && this.socket.readyState === WebSocket.OPEN) {
             const inputBuffer = audioEvent.inputBuffer;
             const pcmData = this.convertToPCM(inputBuffer);
-            const wavData = this.addWavHeader(pcmData, 44100, 1, 16); // Agrega el encabezado WAV
+            const wavData = this.addWavHeader(pcmData, sampleRate, 1, 16); // Usar la nueva frecuencia de muestreo
             this.socket.send(wavData); // Envía los datos al WebSocket
           }
         };
@@ -165,6 +166,7 @@ export class HomeComponent {
         console.error("Error accessing microphone:", error);
       });
   }
+  
   
   // Convertir los datos del AudioBuffer a PCM
   convertToPCM(inputBuffer: AudioBuffer): Uint8Array {
@@ -208,7 +210,9 @@ export class HomeComponent {
       this.isPlaying = true;  // Indica que hay audio en reproducción
 
       if (!this.audioContext) {
-        this.audioContext = new AudioContext({ latencyHint: 'interactive', sampleRate: 44100 });
+        const sampleRate = 16000; // Reducir la frecuencia de muestreo a 16000 Hz
+        this.audioContext = new AudioContext({ sampleRate: sampleRate });
+        // this.audioContext = new AudioContext({ latencyHint: 'interactive', sampleRate: 44100 });
       }
 
       const nextBuffer = this.audioQueue.shift()!;  // Obtiene el siguiente fragmento de audio
