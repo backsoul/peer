@@ -1,9 +1,12 @@
 package client
 
 import (
+	"encoding/binary"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -22,7 +25,6 @@ func HandleAudioConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Asegurarse de cerrar la conexión cuando el cliente se desconecta
 	defer func() {
 		mu.Lock()
 		delete(audioClients, ws)
@@ -38,16 +40,38 @@ func HandleAudioConnections(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Nuevo cliente conectado para envío de audio")
 
-	// Escuchar mensajes del cliente (esperamos recibir audio en formato binario)
 	for {
+		// Escuchar mensajes del cliente (esperamos recibir audio en formato binario con timestamp)
 		messageType, message, err := ws.ReadMessage()
 		if err != nil {
 			log.Printf("Error al leer del WebSocket: %v", err)
 			break
 		}
 
-		// Retransmitir el mensaje a todos los demás clientes
-		broadcastAudio(messageType, message, ws)
+		// Obtener el timestamp del cliente (suponiendo que está al principio del mensaje)
+		if len(message) < 8 {
+			log.Printf("Mensaje recibido es demasiado corto para contener un timestamp")
+			continue
+		}
+
+		// Leer los primeros 8 bytes como el timestamp (int64 en milisegundos)
+		clientTimestamp := int64(binary.LittleEndian.Uint64(message[:8]))
+
+		// Calcular el delay
+		currentTime := time.Now().UnixMilli()
+		delay := currentTime - clientTimestamp
+		log.Printf("Delay calculado: %d ms", delay)
+
+		// Retransmitir el audio (sin el timestamp) a los demás clientes
+		broadcastAudio(messageType, message[8:], ws)
+
+		// Enviar el delay de vuelta al cliente que envió el audio
+		delayMessage := []byte(fmt.Sprintf("Delay: %d ms", delay))
+		err = ws.WriteMessage(websocket.TextMessage, delayMessage)
+		if err != nil {
+			log.Printf("Error al enviar delay al cliente: %v", err)
+			break
+		}
 	}
 }
 
@@ -57,7 +81,6 @@ func broadcastAudio(messageType int, message []byte, sender *websocket.Conn) {
 	defer mu.Unlock()
 
 	for client := range audioClients {
-		// No reenviar al cliente que envió el audio
 		if client != sender {
 			err := client.WriteMessage(messageType, message)
 			if err != nil {
