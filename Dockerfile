@@ -36,15 +36,5 @@ ENV GOOGLE_APPLICATION_CREDENTIALS="/root/credentials.json"
 
 # Exponer el puerto en el que corre el servidor
 EXPOSE 3000
-
-# Copiar los certificados SSL
-COPY cert.pem /app/cert.pem
-COPY key.pem /app/key.pem
-
-# En la imagen final de producción
-COPY --from=builder /app/cert.pem .
-COPY --from=builder /app/key.pem .
-
-
 # Comando para ejecutar la aplicación
 CMD ["./server"]
