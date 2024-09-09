@@ -9,7 +9,8 @@ export class HomeComponent {
   public micStatus: boolean = false;
   public speakerStatus: boolean = false;
   public connection: boolean = false;
-  public urlWS: string = "wss://walkie.lumisar.com/ws";
+  // public urlWS: string = "wss://walkie.lumisar.com/ws";
+  public urlWS: string = 'wss:/192.168.1.51:3000/ws';
   public urlWSSpeech: string = "wss://walkie.lumisar.com/ws-speech";
   public listText: string[] = [];
   private socket: WebSocket | undefined;
