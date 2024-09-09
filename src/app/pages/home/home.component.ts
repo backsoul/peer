@@ -113,31 +113,31 @@ export class HomeComponent {
       console.log(`[error]`);
     };
 
-    this.socketSpeech = new WebSocket(this.urlWSSpeech); 
+    // this.socketSpeech = new WebSocket(this.urlWSSpeech); 
 
-    this.socketSpeech.onopen = () => {
-      console.log("[open] Conexión establecida");
-    };
+    // this.socketSpeech.onopen = () => {
+    //   console.log("[open] Conexión establecida");
+    // };
 
-    this.socketSpeech.onmessage = (event) => {
-      if (typeof event.data === 'string') {
-        // this.listText.push(event.data);
-        this.lastestText = event.data;
-      } 
-    };
+    // this.socketSpeech.onmessage = (event) => {
+    //   if (typeof event.data === 'string') {
+    //     // this.listText.push(event.data);
+    //     this.lastestText = event.data;
+    //   } 
+    // };
 
-    this.socketSpeech.onclose = (event) => {
-      if (event.wasClean) {
-        console.log(`[close] Conexión cerrada limpiamente, código=${event.code} motivo=${event.reason}`);
-      } else {
-        console.log('[close] La conexión se cayó');
-      }
-      this.connection = false;
-    };
+    // this.socketSpeech.onclose = (event) => {
+    //   if (event.wasClean) {
+    //     console.log(`[close] Conexión cerrada limpiamente, código=${event.code} motivo=${event.reason}`);
+    //   } else {
+    //     console.log('[close] La conexión se cayó');
+    //   }
+    //   this.connection = false;
+    // };
 
-    this.socketSpeech.onerror = (error) => {
-      console.log(`[error]`);
-    };
+    // this.socketSpeech.onerror = (error) => {
+    //   console.log(`[error]`);
+    // };
   }
 
   startRecording() {
