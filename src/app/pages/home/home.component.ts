@@ -102,20 +102,20 @@ export class HomeComponent {
   startRecording() {
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(stream => {
-        const sampleRate = 16000;
+        const sampleRate = 8000; // Baja la frecuencia de muestreo
         const audioContext = new AudioContext({ sampleRate });
         const mediaStreamSource = audioContext.createMediaStreamSource(stream);
         const processor = audioContext.createScriptProcessor(1024, 1, 1); // Tamaño reducido del buffer para disminuir latencia
-
+  
         processor.onaudioprocess = (audioEvent) => {
           if (this.micStatus && this.socket && this.socket.readyState === WebSocket.OPEN) {
             const inputBuffer = audioEvent.inputBuffer;
             const pcmData = this.convertToPCM(inputBuffer);
-            const wavData = this.addWavHeader(pcmData, sampleRate, 1, 16);
+            const wavData = this.addWavHeader(pcmData, sampleRate, 1, 8); // Cambiado a 8 bits por muestra y mono (1 canal)
             this.socket.send(wavData);
           }
         };
-
+  
         mediaStreamSource.connect(processor);
         processor.connect(audioContext.destination);
         this.mediaRecorder = mediaStreamSource;
@@ -124,6 +124,38 @@ export class HomeComponent {
         console.error("Error al acceder al micrófono:", error);
       });
   }
+  
+  addWavHeader(pcmData: Uint8Array, sampleRate: number, channels: number, bitsPerSample: number): Uint8Array {
+    const totalDataLen = pcmData.length + 44 - 8;
+    const byteRate = (sampleRate * channels * bitsPerSample) / 8;
+    const blockAlign = (channels * bitsPerSample) / 8;
+  
+    const wavHeader = new ArrayBuffer(44);
+    const view = new DataView(wavHeader);
+  
+    this.writeString(view, 0, 'RIFF');
+    view.setUint32(4, totalDataLen, true);
+    this.writeString(view, 8, 'WAVE');
+  
+    this.writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, channels, true); // Mono
+    view.setUint32(24, sampleRate, true); // Frecuencia de muestreo 8000 Hz
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true); // 8 bits por muestra
+  
+    this.writeString(view, 36, 'data');
+    view.setUint32(40, pcmData.length, true);
+  
+    const wavData = new Uint8Array(44 + pcmData.length);
+    wavData.set(new Uint8Array(wavHeader), 0);
+    wavData.set(pcmData, 44);
+  
+    return wavData;
+  }
+  
 
   convertToPCM(inputBuffer: AudioBuffer): Uint8Array {
     const inputData = inputBuffer.getChannelData(0);
@@ -187,37 +219,6 @@ export class HomeComponent {
         console.error("Error al decodificar los datos de audio:", error);
       });
     }
-  }
-
-  addWavHeader(pcmData: Uint8Array, sampleRate: number, channels: number, bitsPerSample: number): Uint8Array {
-    const totalDataLen = pcmData.length + 44 - 8;
-    const byteRate = (sampleRate * channels * bitsPerSample) / 8;
-    const blockAlign = (channels * bitsPerSample) / 8;
-
-    const wavHeader = new ArrayBuffer(44);
-    const view = new DataView(wavHeader);
-
-    this.writeString(view, 0, 'RIFF');
-    view.setUint32(4, totalDataLen, true);
-    this.writeString(view, 8, 'WAVE');
-
-    this.writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, channels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, byteRate, true);
-    view.setUint16(32, blockAlign, true);
-    view.setUint16(34, bitsPerSample, true);
-
-    this.writeString(view, 36, 'data');
-    view.setUint32(40, pcmData.length, true);
-
-    const wavData = new Uint8Array(44 + pcmData.length);
-    wavData.set(new Uint8Array(wavHeader), 0);
-    wavData.set(pcmData, 44);
-
-    return wavData;
   }
 
   writeString(view: DataView, offset: number, text: string) {
