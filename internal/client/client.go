@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"sync"
@@ -14,6 +15,12 @@ var (
 	audioClients = make(map[*websocket.Conn]bool)
 	mu           sync.Mutex
 )
+
+// AudioMessage define la estructura del mensaje que será enviado a los clientes
+type AudioMessage struct {
+	Audio     []byte `json:"audio"`
+	Timestamp string `json:"timestamp"`
+}
 
 // Maneja las conexiones WebSocket para enviar y retransmitir audio en tiempo real
 func HandleAudioConnections(w http.ResponseWriter, r *http.Request) {
@@ -47,24 +54,33 @@ func HandleAudioConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		// Agregar timestamp al mensaje
-		timestamp := time.Now().Format(time.RFC3339)
-		messageWithTimestamp := append([]byte(timestamp+"|"), message...)
+		// Crear un objeto AudioMessage con el audio y el timestamp actual
+		audioMessage := AudioMessage{
+			Audio:     message,
+			Timestamp: time.Now().Format(time.RFC3339),
+		}
+
+		// Convertir el objeto AudioMessage a JSON
+		messageJSON, err := json.Marshal(audioMessage)
+		if err != nil {
+			log.Printf("Error al convertir el mensaje a JSON: %v", err)
+			continue
+		}
 
 		// Retransmitir el mensaje a todos los demás clientes
-		broadcastAudio(messageType, messageWithTimestamp, ws)
+		broadcastAudio(messageType, messageJSON, ws)
 	}
 }
 
 // Envía el audio recibido a todos los demás clientes conectados
-func broadcastAudio(messageType int, message []byte, sender *websocket.Conn) {
+func broadcastAudio(messageType int, messageJSON []byte, sender *websocket.Conn) {
 	mu.Lock()
 	defer mu.Unlock()
 
 	for client := range audioClients {
 		// No reenviar al cliente que envió el audio
 		if client != sender {
-			err := client.WriteMessage(messageType, message)
+			err := client.WriteMessage(messageType, messageJSON)
 			if err != nil {
 				log.Printf("Error al enviar mensaje a cliente: %v", err)
 				client.Close()
