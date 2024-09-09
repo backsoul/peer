@@ -91,16 +91,33 @@ export class HomeComponent {
     this.socket.onopen = () => {
       console.log("[open] Conexión establecida");
     };
-
+  
     this.socket.onmessage = (event) => {
       if (typeof event.data === 'string') {
         console.log(`[message] Mensaje recibido: ${event.data}`);
       } else if (this.speakerStatus) {
-        // Acumula los datos de audio en la cola
-        this.addToAudioQueue(event.data);
+        // Recibir el objeto {audio, timestamp}
+        const reader = new FileReader();
+        reader.onload = () => {
+          const receivedData = reader.result as string;
+          const message = JSON.parse(receivedData);  // Deserializar JSON
+          const audioData = new Uint8Array(message.audio);  // Convertir a Uint8Array
+          const timestamp = message.timestamp;  // Timestamp del audio
+  
+          console.log('Timestamp recibido:', timestamp);
+  
+          // Comparar el timestamp con el tiempo actual para medir el delay
+          const currentTime = new Date().toISOString();
+          const delay = new Date(currentTime).getTime() - new Date(timestamp).getTime();
+          console.log(`Delay: ${delay} ms`);
+  
+          // Agregar audio a la cola de reproducción
+          this.addToAudioQueue(audioData);
+        };
+        reader.readAsText(event.data);
       }
     };
-
+  
     this.socket.onclose = (event) => {
       if (event.wasClean) {
         console.log(`[close] Conexión cerrada limpiamente, código=${event.code} motivo=${event.reason}`);
@@ -109,37 +126,12 @@ export class HomeComponent {
       }
       this.connection = false;
     };
-
+  
     this.socket.onerror = (error) => {
       console.log(`[error]`);
     };
-
-    // this.socketSpeech = new WebSocket(this.urlWSSpeech); 
-
-    // this.socketSpeech.onopen = () => {
-    //   console.log("[open] Conexión establecida");
-    // };
-
-    // this.socketSpeech.onmessage = (event) => {
-    //   if (typeof event.data === 'string') {
-    //     // this.listText.push(event.data);
-    //     this.lastestText = event.data;
-    //   } 
-    // };
-
-    // this.socketSpeech.onclose = (event) => {
-    //   if (event.wasClean) {
-    //     console.log(`[close] Conexión cerrada limpiamente, código=${event.code} motivo=${event.reason}`);
-    //   } else {
-    //     console.log('[close] La conexión se cayó');
-    //   }
-    //   this.connection = false;
-    // };
-
-    // this.socketSpeech.onerror = (error) => {
-    //   console.log(`[error]`);
-    // };
   }
+  
 
   startRecording() {
     navigator.mediaDevices.getUserMedia({ audio: true })
@@ -194,52 +186,62 @@ export class HomeComponent {
   
 
   // Añade los datos de audio a la cola de reproducción
-  addToAudioQueue(audioData: Blob) {
-    audioData.arrayBuffer().then(buffer => {
-      this.audioQueue.push(new Uint8Array(buffer));  // Agrega el audio a la cola
-      if (!this.isPlaying) {
-        this.playNextInQueue();  // Reproduce el siguiente si no hay audio reproduciéndose
-      }
-    }).catch(error => {
-      console.error("Error reading audio data:", error);
-    });
+  addToAudioQueue(audioData: Uint8Array) {
+    this.audioQueue.push(audioData);
+    if (!this.isPlaying) {
+      this.playNextInQueue();
+    }
   }
+  
 
   // Reproduce el siguiente audio en la cola
   playNextInQueue() {
     if (this.audioQueue.length > 0 && !this.isPlaying) {
       this.isPlaying = true;  // Indica que hay audio en reproducción
-
+  
       if (!this.audioContext) {
         const sampleRate = 16000; // Reducir la frecuencia de muestreo a 16000 Hz
         this.audioContext = new AudioContext({ sampleRate: sampleRate });
-        // this.audioContext = new AudioContext({ latencyHint: 'interactive', sampleRate: 44100 });
       }
-
+  
       const nextBuffer = this.audioQueue.shift()!;  // Obtiene el siguiente fragmento de audio
-      this.audioContext?.decodeAudioData(nextBuffer.buffer, (decodedData) => {
-        this.source = this.audioContext?.createBufferSource();
-        if (this.source && this.audioContext) {
-          this.source.buffer = decodedData;
-          this.source.connect(this.audioContext.destination);
-          this.source.start(0);
-
-          this.source.onended = () => {
-            this.isPlaying = false;  // Reproducción finalizada
-            this.source?.disconnect();
-            this.source = undefined;
-
-            // Reproduce el siguiente en la cola
-            if (this.audioQueue.length > 0) {
-              this.playNextInQueue();  // Reproduce el siguiente fragmento en la cola
-            }
-          };
-        }
-      }).catch(error => {
-        console.error("Error decoding audio data:", error);
-      });
+  
+      // Verifica si el audio tiene el encabezado WAV correcto
+      if (this.isWavFormat(nextBuffer)) {
+        this.audioContext?.decodeAudioData(nextBuffer.buffer, (decodedData) => {
+          this.source = this.audioContext?.createBufferSource();
+          if (this.source && this.audioContext) {
+            this.source.buffer = decodedData;
+            this.source.connect(this.audioContext.destination);
+            this.source.start(0);
+  
+            this.source.onended = () => {
+              this.isPlaying = false;  // Reproducción finalizada
+              this.source?.disconnect();
+              this.source = undefined;
+  
+              // Reproduce el siguiente en la cola
+              if (this.audioQueue.length > 0) {
+                this.playNextInQueue();  // Reproduce el siguiente fragmento en la cola
+              }
+            };
+          }
+        }).catch(error => {
+          console.error("Error decoding audio data:", error);
+        });
+      } else {
+        console.error("El formato del audio no es válido o no tiene un encabezado WAV.");
+        this.isPlaying = false;  // Si el formato no es válido, detener la reproducción.
+      }
     }
   }
+  
+  // Verifica si el Uint8Array tiene un encabezado WAV válido
+  isWavFormat(buffer: Uint8Array): boolean {
+    const header = new TextDecoder("ascii").decode(buffer.slice(0, 4));
+    return header === "RIFF";
+  }
+  
 
   // Añadir encabezado WAV a los datos PCM
   addWavHeader(pcmData: Uint8Array, sampleRate: number, channels: number, bitsPerSample: number): Uint8Array {
