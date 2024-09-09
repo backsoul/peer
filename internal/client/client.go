@@ -5,7 +5,9 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
+	"github.com/backsoul/walkie/internal/speech"
 	"github.com/gorilla/websocket"
 )
 
@@ -34,10 +36,7 @@ func HandleAudioConnections(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Nuevo cliente conectado para envío de audio")
 
-	var audioBuffer bytes.Buffer
-
 	for {
-		// Leer datos de audio del cliente
 		_, audioData, err := ws.ReadMessage()
 		if err != nil {
 			log.Printf("Error al leer mensaje de audio: %v", err)
@@ -45,33 +44,37 @@ func HandleAudioConnections(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Transmitir el audio a todos los demás clientes conectados
-		mu.Lock()
-		for client := range audioClients {
-			if client != ws {
-				err := client.WriteMessage(websocket.BinaryMessage, audioData)
-				if err != nil {
-					log.Printf("Error al retransmitir audio: %v", err)
-					client.Close()
-					delete(audioClients, client)
+		go func(audio []byte) {
+			mu.Lock()
+			defer mu.Unlock()
+			for client := range audioClients {
+				if client != ws {
+					err := client.WriteMessage(websocket.BinaryMessage, audio)
+					if err != nil {
+						log.Printf("Error al retransmitir audio: %v", err)
+						client.Close()
+						delete(audioClients, client)
+					}
 				}
 			}
-		}
-		mu.Unlock()
+		}(audioData)
 
 		// Enviar el audio al WebSocket de procesamiento para transcripción
-		mu.Lock()
-		for client := range speechClients {
-			err := client.WriteMessage(websocket.BinaryMessage, audioData)
-			if err != nil {
-				log.Printf("Error al enviar audio para transcripción: %v", err)
-				client.Close()
-				delete(speechClients, client)
+		go func(audio []byte) {
+			mu.Lock()
+			defer mu.Unlock()
+			for client := range speechClients {
+				err := client.WriteMessage(websocket.BinaryMessage, audio)
+				if err != nil {
+					log.Printf("Error al enviar audio para transcripción: %v", err)
+					client.Close()
+					delete(speechClients, client)
+				}
 			}
-		}
-		mu.Unlock()
+		}(audioData)
 
-		// Acumular los datos de audio
-		audioBuffer.Write(audioData)
+		// Dormir un breve momento para evitar sobrecargar el sistema
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	mu.Lock()
@@ -97,12 +100,26 @@ func HandleSpeechProcessing(w http.ResponseWriter, r *http.Request) {
 	log.Println("Nuevo cliente conectado para procesamiento de audio a texto")
 
 	for {
-		// Aquí se lee el audio enviado desde /ws, lo procesa y retorna el texto
-		_, _, err := ws.ReadMessage()
+		_, audioData, err := ws.ReadMessage()
 		if err != nil {
-			log.Printf("Cliente desconectado del procesamiento de audio a texto: %v", err)
+			log.Printf("Error al recibir audio para transcripción: %v", err)
 			break
 		}
+
+		// Procesar el audio recibido y enviar solo el texto
+		go func(audio []byte) {
+			text, err := speech.StreamAudioToText(bytes.NewReader(audio))
+			if err != nil {
+				log.Printf("Error al convertir audio a texto: %v", err)
+				return
+			}
+
+			// Enviar el texto transcrito de vuelta al cliente
+			err = ws.WriteMessage(websocket.TextMessage, []byte(text))
+			if err != nil {
+				log.Printf("Error al enviar texto: %v", err)
+			}
+		}(audioData)
 	}
 
 	mu.Lock()
