@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/backsoul/walkie/internal/client"
 )
@@ -14,7 +13,7 @@ func main() {
 	http.HandleFunc("/ws", client.HandleAudioConnections)
 
 	// Limpieza de mensajes pendientes cada 10 segundos
-	go client.CleanUpOldMessages(10 * time.Second)
+	// go client.CleanUpOldMessages(10 * time.Second)
 
 	port := ":3000"
 	fmt.Printf("Servidor de WebSocket corriendo en https://localhost%s\n", port)
