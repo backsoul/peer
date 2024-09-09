@@ -28,7 +28,6 @@ func HandleSpeechToText(ws *websocket.Conn, audioData []byte) {
 	}
 }
 
-// Función para transmitir el audio usando la API de Streaming de Google
 func StreamAudioToText(audioStream io.Reader) (string, error) {
 	ctx := context.Background()
 

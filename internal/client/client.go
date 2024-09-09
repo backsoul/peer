@@ -84,7 +84,6 @@ func HandleAudioConnections(w http.ResponseWriter, r *http.Request) {
 	log.Println("Cliente desconectado del envío de audio")
 }
 
-// WebSocket para procesar el audio y devolver texto transcrito
 func HandleSpeechProcessing(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -99,30 +98,49 @@ func HandleSpeechProcessing(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Nuevo cliente conectado para procesamiento de audio a texto")
 
+	var audioBuffer []byte
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
 	for {
-		_, audioData, err := ws.ReadMessage()
-		if err != nil {
-			log.Printf("Error al recibir audio para transcripción: %v", err)
-			break
+		select {
+		case <-ticker.C:
+			if len(audioBuffer) > 1024 { // Asegurarse de tener suficiente audio
+				go processAudioFragment(ws, audioBuffer)
+				audioBuffer = nil // Limpiar el buffer después de procesarlo
+			} else {
+				log.Println("Audio insuficiente para procesar")
+			}
+		default:
+			_, audioData, err := ws.ReadMessage()
+			if err != nil {
+				log.Printf("Error al recibir audio para transcripción: %v", err)
+				break
+			}
+			audioBuffer = append(audioBuffer, audioData...) // Acumular audio
 		}
-
-		// Procesar el audio recibido y enviar solo el texto
-		go func(audio []byte) {
-			text, err := speech.StreamAudioToText(bytes.NewReader(audio))
-			if err != nil {
-				log.Printf("Error al convertir audio a texto: %v", err)
-				return
-			}
-
-			// Enviar el texto transcrito de vuelta al cliente
-			err = ws.WriteMessage(websocket.TextMessage, []byte(text))
-			if err != nil {
-				log.Printf("Error al enviar texto: %v", err)
-			}
-		}(audioData)
 	}
 
+	// Eliminar el cliente una vez que el ciclo termina
 	mu.Lock()
 	delete(speechClients, ws)
 	mu.Unlock()
+}
+
+func processAudioFragment(ws *websocket.Conn, audio []byte) {
+	if len(audio) == 0 {
+		log.Println("No hay audio para procesar")
+		return
+	}
+
+	text, err := speech.StreamAudioToText(bytes.NewReader(audio))
+	if err != nil {
+		log.Printf("Error al convertir audio a texto: %v", err)
+		return
+	}
+
+	err = ws.WriteMessage(websocket.TextMessage, []byte(text))
+	if err != nil {
+		log.Printf("Error al enviar texto: %v", err)
+	}
 }
