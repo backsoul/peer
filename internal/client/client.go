@@ -120,12 +120,6 @@ func HandleSpeechProcessing(w http.ResponseWriter, r *http.Request) {
 			audioBuffer = append(audioBuffer, audioData...) // Acumular audio
 		}
 	}
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	// Aquí van las operaciones seguras
-
 }
 
 func processAudioFragment(ws *websocket.Conn, audio []byte) {

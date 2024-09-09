@@ -29,20 +29,22 @@ func HandleSpeechToText(ws *websocket.Conn, audioData []byte) {
 }
 
 func StreamAudioToText(audioStream io.Reader) (string, error) {
+	// Crear contexto y cliente de Google Speech
 	ctx := context.Background()
-
 	client, err := speech.NewClient(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error al crear cliente de Google Speech: %v", err)
 	}
 	defer client.Close()
 
+	// Iniciar una transmisión de reconocimiento
 	stream, err := client.StreamingRecognize(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error al iniciar transmisión: %v", err)
 	}
 	defer stream.CloseSend()
 
+	// Configuración de la solicitud
 	req := &speechpb.StreamingRecognizeRequest{
 		StreamingRequest: &speechpb.StreamingRecognizeRequest_StreamingConfig{
 			StreamingConfig: &speechpb.StreamingRecognitionConfig{
@@ -56,13 +58,15 @@ func StreamAudioToText(audioStream io.Reader) (string, error) {
 		},
 	}
 
+	// Enviar la configuración inicial
 	if err := stream.Send(req); err != nil {
 		return "", fmt.Errorf("error al enviar configuración: %v", err)
 	}
 
+	// Canal para recibir transcripciones
 	transcriptChan := make(chan string)
-	errChan := make(chan error)
 
+	// Goroutine para recibir transcripciones del servicio de Google Speech
 	go func() {
 		for {
 			resp, err := stream.Recv()
@@ -71,7 +75,8 @@ func StreamAudioToText(audioStream io.Reader) (string, error) {
 				return
 			}
 			if err != nil {
-				errChan <- fmt.Errorf("error al recibir la respuesta: %v", err)
+				log.Printf("error al recibir la respuesta: %v", err)
+				close(transcriptChan)
 				return
 			}
 
@@ -83,6 +88,7 @@ func StreamAudioToText(audioStream io.Reader) (string, error) {
 		}
 	}()
 
+	// Leer el audio del stream y enviar a Google Speech
 	buf := make([]byte, 1024)
 	for {
 		n, err := audioStream.Read(buf)
@@ -103,19 +109,14 @@ func StreamAudioToText(audioStream io.Reader) (string, error) {
 			return "", fmt.Errorf("error al enviar audio: %v", err)
 		}
 
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond) // Evitar saturar el servicio
 	}
 
+	// Recopilar y devolver la transcripción final
 	var finalTranscript string
-	for {
-		select {
-		case transcript, ok := <-transcriptChan:
-			if !ok {
-				return finalTranscript, nil
-			}
-			finalTranscript += transcript + " "
-		case err := <-errChan:
-			return "", err
-		}
+	for transcript := range transcriptChan {
+		finalTranscript += transcript + " "
 	}
+
+	return finalTranscript, nil
 }
