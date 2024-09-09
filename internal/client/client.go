@@ -98,17 +98,20 @@ func HandleSpeechProcessing(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Nuevo cliente conectado para procesamiento de audio a texto")
 
+	// Usa un buffer para acumular los datos de audio
 	var audioBuffer []byte
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
 	go func() {
 		for {
+			// Lee el mensaje binario del WebSocket (audio)
 			_, audioData, err := ws.ReadMessage()
 			if err != nil {
 				log.Printf("Error al recibir audio para transcripción: %v", err)
 				break
 			}
+
 			// Acumula el audio a medida que lo recibe
 			audioBuffer = append(audioBuffer, audioData...)
 		}
@@ -117,7 +120,7 @@ func HandleSpeechProcessing(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-ticker.C:
-			// Procesar el buffer de audio cada 3 segundos
+			// Procesa el buffer de audio cada 3 segundos en una goroutine
 			go processAudioFragment(ws, &audioBuffer)
 		}
 	}
@@ -128,7 +131,7 @@ func processAudioFragment(ws *websocket.Conn, audioBuffer *[]byte) {
 	audioData := make([]byte, len(*audioBuffer))
 	copy(audioData, *audioBuffer)
 
-	// Limpiar el buffer original para los próximos datos
+	// Limpia el buffer original para los próximos datos
 	*audioBuffer = nil
 
 	if len(audioData) == 0 {
@@ -143,9 +146,9 @@ func processAudioFragment(ws *websocket.Conn, audioBuffer *[]byte) {
 		return
 	}
 
-	// Enviar el texto transcrito al cliente en formato de texto
+	// Asegúrate de enviar el texto en formato de texto
 	err = ws.WriteMessage(websocket.TextMessage, []byte(text))
 	if err != nil {
-		log.Printf("Error al enviar texto: %v", err)
+		log.Printf("Error al enviar texto transcrito: %v", err)
 	}
 }

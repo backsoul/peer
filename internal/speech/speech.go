@@ -11,7 +11,6 @@ import (
 )
 
 func StreamAudioToText(audioStream io.Reader) (string, error) {
-	// Inicializa el cliente de Google Speech-to-Text
 	ctx := context.Background()
 	client, err := speech.NewClient(ctx)
 	if err != nil {
@@ -19,16 +18,19 @@ func StreamAudioToText(audioStream io.Reader) (string, error) {
 	}
 	defer client.Close()
 
+	// Convierte el stream de audio a bytes
+	audioBytes := audioStreamToBytes(audioStream)
+
 	// Configura la solicitud de reconocimiento de audio
 	req := &speechpb.RecognizeRequest{
 		Config: &speechpb.RecognitionConfig{
 			Encoding:        speechpb.RecognitionConfig_LINEAR16,
 			SampleRateHertz: 44100,
-			LanguageCode:    "es-ES", // Cambia según el idioma que necesites
+			LanguageCode:    "es-ES",
 		},
 		Audio: &speechpb.RecognitionAudio{
 			AudioSource: &speechpb.RecognitionAudio_Content{
-				Content: audioStreamToBytes(audioStream), // Convierte el stream de audio a bytes
+				Content: audioBytes,
 			},
 		},
 	}
@@ -50,7 +52,7 @@ func StreamAudioToText(audioStream io.Reader) (string, error) {
 	return resultText, nil
 }
 
-// Función auxiliar para convertir el io.Reader (audioStream) a bytes
+// Convierte el io.Reader (audioStream) a bytes
 func audioStreamToBytes(audioStream io.Reader) []byte {
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(audioStream)
