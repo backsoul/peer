@@ -1,118 +1,87 @@
 package client
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"sync"
 
-	"github.com/pion/webrtc/v3"
+	"github.com/gorilla/websocket"
 )
 
 var (
-	peerConnections = make(map[string]*webrtc.PeerConnection) // Almacena las conexiones WebRTC de los clientes
-	mu              sync.Mutex                                // Para sincronizar el acceso a las conexiones
+	upgrader     = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	audioClients = make(map[*websocket.Conn]bool)
+	mu           sync.Mutex
+	broadcastCh  = make(chan broadcastMessage, 100) // Canal para manejar la retransmisión de audio
 )
 
-// broadcastMessage estructura para manejar la retransmisión
 type broadcastMessage struct {
-	Data   []byte
-	Sender *webrtc.PeerConnection
+	messageType int
+	message     []byte
+	sender      *websocket.Conn
 }
-
-// Canal para manejar la retransmisión de audio
-var broadcastCh = make(chan broadcastMessage, 100)
 
 // Inicializar la retransmisión en un goroutine separado
 func init() {
 	go handleBroadcasts()
 }
 
-// Manejamos las ofertas de conexión WebRTC
-func HandleOffer(w http.ResponseWriter, r *http.Request) {
-	// Obtener la oferta SDP del cliente
-	var offer webrtc.SessionDescription
-	err := json.NewDecoder(r.Body).Decode(&offer)
+// Maneja las conexiones WebSocket para enviar y retransmitir audio en tiempo real
+func HandleAudioConnections(w http.ResponseWriter, r *http.Request) {
+	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		http.Error(w, "Invalid offer", http.StatusBadRequest)
+		log.Printf("Error al actualizar la conexión: %v", err)
 		return
 	}
+	defer func() {
+		mu.Lock()
+		delete(audioClients, ws)
+		mu.Unlock()
+		ws.Close()
+		log.Println("Cliente desconectado del envío de audio")
+	}()
 
-	// Crear una nueva conexión Peer WebRTC
-	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
-	if err != nil {
-		log.Fatalf("Error creando PeerConnection: %v", err)
-	}
-
-	// Canal de datos para enviar y recibir audio
-	peerConnection.OnDataChannel(func(dc *webrtc.DataChannel) {
-		dc.OnMessage(func(msg webrtc.DataChannelMessage) {
-			// Enviar el mensaje al canal de retransmisión
-			broadcastCh <- broadcastMessage{
-				Data:   msg.Data,
-				Sender: peerConnection,
-			}
-		})
-	})
-
-	// Almacenar la conexión en el map de conexiones
 	mu.Lock()
-	peerConnections[peerConnection.RemoteDescription().SDP] = peerConnection
+	audioClients[ws] = true
 	mu.Unlock()
+	log.Println("Nuevo cliente conectado para envío de audio")
 
-	// Establecer el SDP remoto
-	err = peerConnection.SetRemoteDescription(offer)
-	if err != nil {
-		log.Fatalf("Error al establecer la descripción remota: %v", err)
+	// Escuchar mensajes del cliente
+	for {
+		messageType, message, err := ws.ReadMessage()
+		if err != nil {
+			log.Printf("Error al leer del WebSocket: %v", err)
+			break
+		}
+
+		// Enviar el mensaje recibido al canal de retransmisión
+		broadcastCh <- broadcastMessage{
+			messageType: messageType,
+			message:     message,
+			sender:      ws,
+		}
 	}
-
-	// Crear la respuesta SDP
-	answer, err := peerConnection.CreateAnswer(nil)
-	if err != nil {
-		log.Fatalf("Error creando respuesta: %v", err)
-	}
-
-	// Establecer la descripción local
-	err = peerConnection.SetLocalDescription(answer)
-	if err != nil {
-		log.Fatalf("Error al establecer la descripción local: %v", err)
-	}
-
-	// Enviar la respuesta SDP de vuelta al cliente
-	response := peerConnection.LocalDescription()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
 }
 
 // Maneja la retransmisión de audio a todos los clientes conectados
 func handleBroadcasts() {
 	for msg := range broadcastCh {
-		retransmitAudio(msg.Data, msg.Sender)
+		broadcastAudio(msg.messageType, msg.message, msg.sender)
 	}
 }
 
 // Retransmite el audio a todos los clientes conectados, excepto al remitente
-func retransmitAudio(data []byte, sender *webrtc.PeerConnection) {
+func broadcastAudio(messageType int, message []byte, sender *websocket.Conn) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	// Iterar sobre todas las conexiones activas
-	for _, client := range peerConnections {
-		if client != sender { // No enviar el audio de vuelta al remitente
-			// Crear un canal de datos o usar uno existente
-			dataChannel, err := client.CreateDataChannel("audio", nil)
+	for client := range audioClients {
+		if client != sender {
+			err := client.WriteMessage(messageType, message)
 			if err != nil {
-				log.Printf("Error creando DataChannel: %v", err)
-				continue
-			}
-
-			// Enviar el audio por el DataChannel
-			err = dataChannel.Send(data)
-			if err != nil {
-				log.Printf("Error enviando el audio: %v", err)
-			} else {
-				fmt.Println("Audio retransmitido a un cliente")
+				log.Printf("Error al enviar mensaje a cliente: %v", err)
+				client.Close()
+				delete(audioClients, client)
 			}
 		}
 	}
