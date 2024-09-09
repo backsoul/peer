@@ -121,10 +121,11 @@ func HandleSpeechProcessing(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Eliminar el cliente una vez que el ciclo termina
 	mu.Lock()
-	delete(speechClients, ws)
-	mu.Unlock()
+	defer mu.Unlock()
+
+	// Aquí van las operaciones seguras
+
 }
 
 func processAudioFragment(ws *websocket.Conn, audio []byte) {
