@@ -24,14 +24,26 @@
 
 .bg-connection{
     background: #00D9C0;
-            color: white;    box-shadow: 4px 6px 0px 1px #009b88;
-            border: 3px solid #009b88;
+            /* color: white;    box-shadow: 4px 6px 0px 1px #009b88; */
+            /* border: 3px solid #009b88; */
 }
+
+.btn-connection{
+    transition: .3s all;
+    box-shadow: 1px 4px 0px 1px #006b5e;
+}
+
+.btn-connection:hover{
+    box-shadow: none;
+    transition: .3s all;
+    transform: translate(1px, 4px);
+ }
 
 .bg-close {
     background: #C5283D;
-            color: white;    box-shadow:4px 6px 0px 1px #851726;
-            border: 3px solid #C5283D;
+            color: white;    
+            /* box-shadow:4px 6px 0px 1px #851726; */
+            /* border: 3px solid #C5283D; */
 }
 /* Estilo para navegadores basados en WebKit (Chrome, Safari) */
 .scrollContainer {

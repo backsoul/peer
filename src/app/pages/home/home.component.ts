@@ -20,12 +20,13 @@ export class HomeComponent {
   private source: AudioBufferSourceNode | undefined;
   private audioQueue: Array<Uint8Array> = [];  // Cola de audio en espera
   private isPlaying: boolean = false;  // Indicador si está reproduciendo audio
+  public lastestText: any;
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
   constructor() {
   }
 
-  ngAfterViewChecked() {
+  ngAfterViewInit() {
     this.scrollToBottom(); // Asegúrate de desplazarte al final después de cada cambio
   }
   changeMicStatus() {
@@ -39,7 +40,9 @@ export class HomeComponent {
 
   private scrollToBottom(): void {
     try {
-      this.scrollContainer.nativeElement.scrollTop = this.scrollContainer.nativeElement.scrollHeight;
+      if (this.scrollContainer && this.scrollContainer.nativeElement) {
+        this.scrollContainer.nativeElement.scrollTop = this.scrollContainer.nativeElement.scrollHeight;
+      }
     } catch (err) {
       console.error('Error scrolling to bottom:', err);
     }
@@ -118,7 +121,8 @@ export class HomeComponent {
 
     this.socketSpeech.onmessage = (event) => {
       if (typeof event.data === 'string') {
-        this.listText.push(event.data);
+        // this.listText.push(event.data);
+        this.lastestText = event.data;
       } 
     };
 
