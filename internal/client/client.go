@@ -141,12 +141,35 @@ func HandleSpeechProcessing(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Nuevo cliente conectado para procesamiento de audio a texto")
 
+	// Loop para recibir mensajes (audio) de los clientes conectados a /ws-speech
 	for {
-		_, _, err := ws.ReadMessage()
+		_, audioData, err := ws.ReadMessage()
 		if err != nil {
 			log.Printf("Error al leer mensaje en /ws-speech: %v", err)
 			break
 		}
+
+		// Procesar el audio recibido
+		go func(audio []byte) {
+			// Convertir el audio a texto
+			text := speech.ConvertAudioToText(audio)
+			if text == "" {
+				log.Printf("No se pudo convertir el audio a texto")
+				return
+			}
+
+			// Enviar el texto a todos los clientes conectados a /ws-speech
+			mu.Lock()
+			defer mu.Unlock()
+			for client := range speechClients {
+				err := client.WriteMessage(websocket.TextMessage, []byte(text))
+				if err != nil {
+					log.Printf("Error al enviar texto a cliente: %v", err)
+					client.Close()
+					delete(speechClients, client)
+				}
+			}
+		}(audioData) // Aquí se pasa el audio recibido para ser procesado
 	}
 
 	mu.Lock()
