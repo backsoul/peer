@@ -102,16 +102,16 @@ export class HomeComponent {
   startRecording() {
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(stream => {
-        const sampleRate = 8000; // Baja la frecuencia de muestreo
+        const sampleRate = 4000; // Frecuencia de muestreo muy baja
         const audioContext = new AudioContext({ sampleRate });
         const mediaStreamSource = audioContext.createMediaStreamSource(stream);
-        const processor = audioContext.createScriptProcessor(1024, 1, 1); // Tamaño reducido del buffer para disminuir latencia
+        const processor = audioContext.createScriptProcessor(1024, 1, 1);
   
         processor.onaudioprocess = (audioEvent) => {
           if (this.micStatus && this.socket && this.socket.readyState === WebSocket.OPEN) {
             const inputBuffer = audioEvent.inputBuffer;
             const pcmData = this.convertToPCM(inputBuffer);
-            const wavData = this.addWavHeader(pcmData, sampleRate, 1, 8); // Cambiado a 8 bits por muestra y mono (1 canal)
+            const wavData = this.addWavHeader(pcmData, sampleRate, 1, 8); // 8 bits y mono
             this.socket.send(wavData);
           }
         };
@@ -124,6 +124,7 @@ export class HomeComponent {
         console.error("Error al acceder al micrófono:", error);
       });
   }
+  
   
   addWavHeader(pcmData: Uint8Array, sampleRate: number, channels: number, bitsPerSample: number): Uint8Array {
     const totalDataLen = pcmData.length + 44 - 8;
