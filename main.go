@@ -79,13 +79,13 @@ func handleJoin(conn *websocket.Conn, data map[string]interface{}) {
 		rooms[roomID] = room
 	}
 
-	if len(room) >= 2 {
-		conn.WriteMessage(websocket.TextMessage, encodeJSON(map[string]interface{}{
-			"type":   "full_room",
-			"roomId": roomID,
-		}))
-		return
-	}
+	// if len(room) >= 2 {
+	// 	conn.WriteMessage(websocket.TextMessage, encodeJSON(map[string]interface{}{
+	// 		"type":   "full_room",
+	// 		"roomId": roomID,
+	// 	}))
+	// 	return
+	// }
 
 	room[conn] = true
 
