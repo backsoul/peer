@@ -180,7 +180,7 @@ export class HomeComponent {
 
     if(!this.listUUIDS[data.from].video || !this.listUUIDS[data.from].video){
       // Verificar el tipo de track y manejarlo adecuadamente
-      let remoteStream = event.streams[0];
+      this.remoteStream = event.streams[0];
       if (!this.audioContext) {
         this.audioContext = new AudioContext();
       }
@@ -193,7 +193,7 @@ export class HomeComponent {
       const videoElement = document.createElement('video');
       videoElement.autoplay = true;
       videoElement.playsInline = true;
-      videoElement.srcObject = remoteStream;
+      videoElement.srcObject = this.remoteStream;
       videoElement.className = 'absolute inset-0 w-full h-full object-cover rounded-full shadow-md';
   
       // Añadir el video al div
