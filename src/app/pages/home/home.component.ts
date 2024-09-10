@@ -11,8 +11,8 @@ import {
   styleUrls: ['./home.component.css'],
 })
 export class HomeComponent {
-  public micStatus: boolean = false;
-  public speakerStatus: boolean = false;
+  public micStatus: boolean = true;
+  public speakerStatus: boolean = true;
   public connection: boolean = false;
   public urlWS: string = 'wss://walkie.lumisar.com/ws';
   @ViewChild('audioProgress') audioProgress!: ElementRef;
@@ -29,6 +29,7 @@ export class HomeComponent {
     video: true,
     audio: true,
   };
+  listUUIDS: any[] = [];
   iceServers = {
     iceServers: [
       {
@@ -42,15 +43,24 @@ export class HomeComponent {
   analyser: AnalyserNode | null = null;
   dataArray: Uint8Array | null = null;
   constructor(private cdr: ChangeDetectorRef) {}
-  ngAfterViewInit() {
-  }
-
-  toggleMic(){
+  ngAfterViewInit() {}
+  toggleMic() {
     this.micStatus = !this.micStatus;
+    console.log('Micrófono:', this.micStatus ? 'Activado' : 'Desactivado');
+    if (this.localStream) {
+      this.localStream.getAudioTracks().forEach((track: any) => {
+        track.enabled = this.micStatus;
+      });
+    }
   }
 
-  toggleSpeakerStatus(){
+  toggleSpeakerStatus() {
     this.speakerStatus = !this.speakerStatus;
+    if (this.remoteStream) {
+      this.remoteStream.getAudioTracks().forEach((track: any) => {
+        track.enabled = this.speakerStatus;
+      });
+    }
   }
   ngOnInit() {
     this.ws = new WebSocket(this.urlWS);
@@ -73,21 +83,19 @@ export class HomeComponent {
         //   alert('The room is full, please try another one');
         //   break;
         case 'start_call':
-          this.createPeerConnection();
+          console.log('start_call', data);
+          this.createPeerConnection(data);
           await this.createOffer();
           break;
         case 'webrtc_offer':
-          if (!this.isRoomCreator) {
-            this.createPeerConnection();
-            console.log('webrtc_offer', data.sdp);
-            this.rtcPeerConnection.setRemoteDescription(
-              new RTCSessionDescription(data.sdp)
-            );
-            await this.createAnswer();
-          }
+          console.log('webrtc_offer', data);
+          this.createPeerConnection(data);
+          this.rtcPeerConnection.setRemoteDescription(
+            new RTCSessionDescription(data.sdp)
+          );
+          await this.createAnswer();
           break;
         case 'webrtc_answer':
-          console.log('webrtc_offer', data.sdp);
           this.rtcPeerConnection.setRemoteDescription(
             new RTCSessionDescription(data.sdp)
           );
@@ -138,10 +146,65 @@ export class HomeComponent {
     }
   }
 
-  createPeerConnection() {
+  setRemoteStream(event: any, data:any) {
+    console.log("setRemoteStream - data", data);
+  
+    console.log('setRemoteStream', event.track.kind);
+    console.log('listUUIDS: ', this.listUUIDS);
+  
+    // Verifica si el UUID existe en this.listUUIDS, si no, inicialízalo
+    if (!this.listUUIDS[data.from]) {
+      this.listUUIDS[data.from] = { video: null, audio: null };
+    }
+  
+    if (event.track.kind === 'video') {
+      this.listUUIDS[data.from].video = event;
+    }
+    if (event.track.kind === 'audio') {
+      this.listUUIDS[data.from].audio = event;
+    }
+  
+    console.log('video: ', this.listUUIDS[data.from].video);
+    console.log('audio: ', this.listUUIDS[data.from].audio);
+
+    if(!this.listUUIDS[data.from].video || !this.listUUIDS[data.from].video){
+      // Verificar el tipo de track y manejarlo adecuadamente
+      this.remoteStream = event.streams[0];
+      if (!this.audioContext) {
+        this.audioContext = new AudioContext();
+      }
+  
+      // Crear el elemento div contenedor
+      const containerDiv = document.createElement('div');
+      containerDiv.className = 'bg-white rounded-lg w-full h-full'; // Aplicar clase al div
+  
+      // Crear el elemento video
+      const videoElement = document.createElement('video');
+      videoElement.autoplay = true;
+      videoElement.playsInline = true;
+      videoElement.srcObject = this.remoteStream;
+      videoElement.className = 'rounded-lg w-full h-full';
+  
+      // Añadir el video al div
+      containerDiv.appendChild(videoElement);
+      // Añadir el contenedor principal al DOM
+      this.videoContainer.nativeElement.appendChild(containerDiv);
+  
+      // Forzar la actualización de cambios
+      this.cdr.detectChanges();
+    }
+  }
+
+  createPeerConnection(data: any) {
+    console.log('createPeerConnection data: ', data);
+    console.log('listUUIDS: ', this.listUUIDS);
+
+    // Crear una nueva RTCPeerConnection solo si no existe una para este UUID
     this.rtcPeerConnection = new RTCPeerConnection(this.iceServers);
     this.addLocalTracks();
-    this.rtcPeerConnection.ontrack = this.setRemoteStream.bind(this);
+    // this.rtcPeerConnection.ontrack = this.setRemoteStream.bind(this,data);
+    this.rtcPeerConnection.ontrack = (event:any) => this.setRemoteStream(event, data);
+
     this.rtcPeerConnection.onicecandidate = this.sendIceCandidate.bind(this);
   }
 
@@ -183,28 +246,6 @@ export class HomeComponent {
     } catch (error) {
       console.error('Error creating answer', error);
     }
-  }
-
-  setRemoteStream(event: any) {
-    this.remoteStream = event.streams[0];
-  
-    if (!this.audioContext) {
-      this.audioContext = new AudioContext();
-    }
-  
-    // Crear el elemento div contenedor
-    const containerDiv = document.createElement('div');
-    containerDiv.className = 'bg-white rounded-lg w-full h-full'; // Aplicar clase al div
-  
-    // Crear el elemento video
-    const videoElement = document.createElement('video');
-    videoElement.autoplay = true;
-    videoElement.playsInline = false;
-    videoElement.srcObject = this.remoteStream;
-  
-    // Añadir el video al div
-    containerDiv.appendChild(videoElement);
-    this.cdr.detectChanges();
   }
 
   sendIceCandidate(event: any) {
