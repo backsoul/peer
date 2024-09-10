@@ -20,7 +20,7 @@ export class HomeComponent {
   showRoomSelection: boolean = true;
   videoChatContainer: boolean = false;
   mediaConstraints = {
-    video: true,
+    video: false,
     audio: true
   };
   iceServers = {
