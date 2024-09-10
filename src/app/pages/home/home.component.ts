@@ -44,6 +44,14 @@ export class HomeComponent {
   constructor(private cdr: ChangeDetectorRef) {}
   ngAfterViewInit() {
   }
+
+  toggleMic(){
+    this.micStatus = !this.micStatus;
+  }
+
+  toggleSpeakerStatus(){
+    this.speakerStatus = !this.speakerStatus;
+  }
   ngOnInit() {
     this.ws = new WebSocket(this.urlWS);
     this.ws.onopen = () => {
@@ -191,48 +199,12 @@ export class HomeComponent {
     // Crear el elemento video
     const videoElement = document.createElement('video');
     videoElement.autoplay = true;
-    videoElement.playsInline = true;
+    videoElement.playsInline = false;
     videoElement.srcObject = this.remoteStream;
   
     // Añadir el video al div
     containerDiv.appendChild(videoElement);
-  
-    // Crear el contenedor de la barra de progreso
-    const progressContainer = document.createElement('div');
-    
-    // Estilos aplicados directamente desde TypeScript
-    progressContainer.style.width = '20%';
-    progressContainer.style.height = '10px';
-    progressContainer.style.borderRadius = '10px';
-    progressContainer.style.marginTop = '1rem';
-  
-    // Crear la barra de progreso
-    const progressBar = document.createElement('div');
-  
-    // Estilos aplicados directamente desde TypeScript
-    progressBar.style.height = '100%';
-    progressBar.style.width = '0%'; // Inicialmente en 0%
-    progressBar.style.backgroundColor = '#4caf50';
-    progressBar.style.borderRadius = '10px';
-  
-    // Añadir la barra de progreso al contenedor
-    progressContainer.appendChild(progressBar);
-  
-    // Añadir el contenedor de progreso al contenedor principal
-    containerDiv.appendChild(progressContainer);
-  
-    // Añadir el contenedor principal al DOM
-    this.videoContainer.nativeElement.appendChild(containerDiv);
-  
-    // Almacenar la referencia de la barra de progreso
-    const streamId = this.remoteStream.id;
-    this.audioProgressBars.set(streamId, progressBar); // Guardamos la barra con el ID del stream
-  
-    // Forzar la actualización de cambios
     this.cdr.detectChanges();
-  
-    // Configurar el stream de audio para visualización
-    this.initAudioProcessing(this.remoteStream, streamId); // Pasamos el stream y su ID
   }
 
   sendIceCandidate(event: any) {
@@ -249,17 +221,26 @@ export class HomeComponent {
   }
 
   joinRoom() {
-    if (!this.roomId) {
-      alert('Please type a room ID');
-    } else {
+    if (!this.connection && this.roomId.trim() !== '') {
+      this.connection = true;
       this.ws.send(JSON.stringify({ type: 'join', roomId: this.roomId }));
       this.showVideoConference();
+      this.connection = true;
+    } else {
+      this.connection = false;
+      this.roomId = '';
+      this.hiddenVideoConference();
     }
   }
 
   showVideoConference() {
     this.showRoomSelection = false;
     this.videoChatContainer = true;
+  }
+
+  hiddenVideoConference() {
+    this.showRoomSelection = true;
+    this.videoChatContainer = false;
   }
 
   initAudioProcessing(stream: any, streamId: string) {

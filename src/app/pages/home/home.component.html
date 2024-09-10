@@ -57,6 +57,7 @@
           "
           class=""
           #videoContainer
+          *ngIf="videoChatContainer"
         >
         </div>
       </div>
@@ -72,7 +73,6 @@
             height: fit-content;
             width: 100%;
           "
-          *ngIf="showRoomSelection"
           [ngClass]="{ 'bg-connection': connection, 'bg-close': !connection }"
         >
           <h1
@@ -102,7 +102,7 @@
               class="col-span-4"
             />
             <div
-              (click)="joinRoom()"
+             
               class="col-span-4 cursor-pointer grid grid-cols-4"
               [ngClass]="{
                 'btn-connection': !connection,
@@ -116,6 +116,7 @@
                 width: 100%;
                 border-radius: 1rem;
               "
+               (click)="joinRoom()"
             >
               <h2
                 *ngIf="connection"
@@ -181,7 +182,7 @@
             bottom: 1rem;
           "
         >
-          <div class="button-class">
+          <div class="button-class" (click)="toggleMic()">
             <div style="cursor: pointer">
               <svg
                 *ngIf="micStatus"
@@ -219,7 +220,7 @@
             </div>
           </div>
 
-          <div class="button-class">
+          <div class="button-class" (click)="toggleSpeakerStatus()">
             <svg
               *ngIf="speakerStatus"
               class="w-6 h-6 text-gray-800 text-white"
