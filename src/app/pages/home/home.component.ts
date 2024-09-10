@@ -242,35 +242,4 @@ export class HomeComponent {
     this.showRoomSelection = true;
     this.videoChatContainer = false;
   }
-
-  initAudioProcessing(stream: any, streamId: string) {
-    if (this.audioContext && stream) {
-      const source = this.audioContext.createMediaStreamSource(stream);
-      this.analyser = this.audioContext.createAnalyser();
-      source.connect(this.analyser);
-      this.analyser.fftSize = 2048;
-      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-  
-      // Iniciar el proceso de actualización de la barra de progreso
-      this.updateProgressBar(streamId);
-    }
-  }
-  
-  updateProgressBar(streamId: string) {
-    if (this.audioContext && this.analyser && this.dataArray) {
-      this.analyser.getByteFrequencyData(this.dataArray);
-  
-      const sum = this.dataArray.reduce((a, b) => a + b, 0);
-      const average = sum / this.dataArray.length;
-      const progress = (average / 255) * 1000; // Se calcula el progreso en %
-  
-      const progressBar = this.audioProgressBars.get(streamId);
-  
-      if (progressBar) {
-        progressBar.style.width = `${progress}%`; // Actualizar el ancho de la barra de progreso
-      }
-  
-      requestAnimationFrame(() => this.updateProgressBar(streamId));
-    }
-  }
 }
