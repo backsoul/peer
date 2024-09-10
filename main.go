@@ -12,12 +12,14 @@ func enableCORS(w *http.ResponseWriter) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 	(*w).Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	(*w).Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	(*w).Header().Set("Access-Control-Max-Age", "86400") // Cache the preflight response
 }
 
 func main() {
 	http.HandleFunc("/offer", func(w http.ResponseWriter, r *http.Request) {
 		enableCORS(&w)
 
+		// Handle preflight request (OPTIONS)
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
