@@ -131,6 +131,7 @@ export class HomeComponent {
       videoElement.autoplay = true;
       videoElement.muted = true;
       videoElement.srcObject = this.localStream;
+      videoElement.playsInline = true;
       videoElement.className = 'bg-white rounded-lg w-full h-full';
 
       // Añadir el video al div
