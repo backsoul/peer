@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -16,13 +15,6 @@ var upgrader = websocket.Upgrader{
 }
 
 var rooms = make(map[string]map[*websocket.Conn]string) // map connection to UUID
-var mu sync.Mutex                                       // Mutex para proteger el acceso a rooms
-
-type Connection struct {
-	conn       *websocket.Conn
-	send       chan []byte
-	clientUUID string
-}
 
 func main() {
 	http.HandleFunc("/", handleConnection)
@@ -42,24 +34,14 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	clientUUID := uuid.New().String() // Genera un UUID para el cliente
+	clientUUID := uuid.New().String() // Generate a UUID for the client
 	fmt.Println("Client connected with UUID:", clientUUID)
 
-	// Crea la estructura Connection con un canal de escritura
-	connection := &Connection{
-		conn:       conn,
-		send:       make(chan []byte, 256), // Canal bufferizado para escribir mensajes
-		clientUUID: clientUUID,
-	}
-
-	// Lanzar una goroutine que escuche el canal de send y escriba en el WebSocket
-	go handleWrites(connection)
-
-	// Enviar el UUID al cliente
-	connection.send <- encodeJSON(map[string]interface{}{
+	// Send the UUID to the client
+	conn.WriteMessage(websocket.TextMessage, encodeJSON(map[string]interface{}{
 		"type": "uuid",
 		"uuid": clientUUID,
-	})
+	}))
 
 	for {
 		_, message, err := conn.ReadMessage()
@@ -82,65 +64,49 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 
 		switch messageType {
 		case "join":
-			handleJoin(connection, data)
+			handleJoin(conn, data, clientUUID)
 		case "start_call", "webrtc_offer", "webrtc_answer", "webrtc_ice_candidate":
-			handleRoomMessage(data, connection)
+			handleRoomMessage(data, conn, clientUUID)
 		default:
 			log.Printf("Unknown message type: %s\n", messageType)
 		}
 	}
 }
 
-func handleWrites(c *Connection) {
-	for msg := range c.send {
-		err := c.conn.WriteMessage(websocket.TextMessage, msg)
-		if err != nil {
-			log.Println("Error writing message:", err)
-			break
-		}
-	}
-}
-
-func handleJoin(connection *Connection, data map[string]interface{}) {
+func handleJoin(conn *websocket.Conn, data map[string]interface{}, clientUUID string) {
 	roomID, _ := data["roomId"].(string)
-
-	mu.Lock() // Bloquear el acceso concurrente a rooms
 	room, exists := rooms[roomID]
 	if !exists {
 		room = make(map[*websocket.Conn]string)
 		rooms[roomID] = room
 	}
-	room[connection.conn] = connection.clientUUID
-	mu.Unlock() // Desbloquear
+
+	room[conn] = clientUUID
 
 	if len(room) == 1 {
-		connection.send <- encodeJSON(map[string]interface{}{
+		conn.WriteMessage(websocket.TextMessage, encodeJSON(map[string]interface{}{
 			"type":   "room_created",
 			"roomId": roomID,
-		})
+		}))
 	} else {
-		connection.send <- encodeJSON(map[string]interface{}{
+		conn.WriteMessage(websocket.TextMessage, encodeJSON(map[string]interface{}{
 			"type":   "room_joined",
 			"roomId": roomID,
-		})
+		}))
 		broadcast(roomID, map[string]interface{}{
 			"type": "start_call",
-		}, connection.clientUUID)
+		}, clientUUID)
 	}
 }
 
-func handleRoomMessage(data map[string]interface{}, connection *Connection) {
+func handleRoomMessage(data map[string]interface{}, conn *websocket.Conn, clientUUID string) {
 	roomID, _ := data["roomId"].(string)
-	mu.Lock()
 	room, exists := rooms[roomID]
-	mu.Unlock()
-
 	if exists {
 		for client, _ := range room {
-			if client != connection.conn {
+			if client != conn {
 				message := data
-				message["from"] = connection.clientUUID // Añadir el UUID del remitente
-				rooms[roomID][client] = connection.clientUUID
+				message["from"] = clientUUID // Add the sender's UUID
 				client.WriteMessage(websocket.TextMessage, encodeJSON(message))
 			}
 		}
@@ -148,14 +114,11 @@ func handleRoomMessage(data map[string]interface{}, connection *Connection) {
 }
 
 func broadcast(roomID string, message map[string]interface{}, clientUUID string) {
-	mu.Lock()
 	room, exists := rooms[roomID]
-	mu.Unlock()
-
 	if exists {
 		for client, uuid := range room {
 			if uuid != clientUUID {
-				message["from"] = clientUUID // Incluir el UUID del remitente
+				message["from"] = clientUUID // Include the sender's UUID
 				client.WriteMessage(websocket.TextMessage, encodeJSON(message))
 			}
 		}
