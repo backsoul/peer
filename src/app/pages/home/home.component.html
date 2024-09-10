@@ -47,17 +47,16 @@
     "
   >
     <div style="height: 100%; width: 100%" class="flex flex-col">
-      <div style="width: 100%; padding: 2rem" class="lg:col-span-6 col-span-8">
-        <div
-        class="grid  gap-4 md:grid-cols-2 grid-cols-1 w-full"
-          #videoContainer
-          *ngIf="videoChatContainer"
-        >
+
+      <div class="lg:col-span-6 col-span-8 w-full p-8">
+        <div class="grid gap-4 md:grid-cols-2 grid-cols-2 w-full" #videoContainer *ngIf="videoChatContainer">
         </div>
       </div>
+      
+      
 
       <div
-        style="height: 100%; width: 100%; padding: 1rem"
+        style="height: 100%; width: 100%; padding: 1rem;     position: absolute;"
         class="lg:col-span-2 col-span-8 flex flex-col justify-end items-end lg:flex lg:justify-end lg:items-start"
       >
         <div
@@ -176,6 +175,24 @@
             bottom: 1rem;
           "
         >
+        <div class="button-class" (click)="toggleVideo()">
+          <div style="cursor: pointer">
+
+            <svg *ngIf="videoStatus"
+            class="w-6 h-6 text-gray-800 text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+              <path fill-rule="evenodd" d="M14 7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7Zm2 9.387 4.684 1.562A1 1 0 0 0 22 17V7a1 1 0 0 0-1.316-.949L16 7.613v8.774Z" clip-rule="evenodd"/>
+            </svg>
+            
+            <svg   *ngIf="!videoStatus"
+            class="w-6 h-6 text-gray-800 text-white" class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+              <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 6H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1Zm7 11-6-2V9l6-2v10Z"/>
+            </svg>
+            
+
+
+          </div>
+        </div>
+
           <div class="button-class" (click)="toggleMic()">
             <div style="cursor: pointer">
               <svg

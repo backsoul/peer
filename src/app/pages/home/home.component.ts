@@ -12,6 +12,7 @@ import {
 })
 export class HomeComponent {
   public micStatus: boolean = true;
+  public videoStatus: boolean = true;
   public speakerStatus: boolean = true;
   public connection: boolean = false;
   public urlWS: string = 'wss://walkie.lumisar.com/ws';
@@ -50,6 +51,16 @@ export class HomeComponent {
     if (this.localStream) {
       this.localStream.getAudioTracks().forEach((track: any) => {
         track.enabled = this.micStatus;
+      });
+    }
+  }
+
+  toggleVideo() {
+    this.videoStatus = !this.videoStatus;
+    console.log('Micrófono:', this.videoStatus ? 'Activado' : 'Desactivado');
+    if (this.localStream) {
+      this.localStream.getVideoTracks().forEach((track: any) => {
+        track.enabled = this.videoStatus;
       });
     }
   }
@@ -124,15 +135,14 @@ export class HomeComponent {
       );
       // Crear el elemento div
       const containerDiv = document.createElement('div');
-      containerDiv.className = 'bg-white rounded-lg w-full h-full'; // Aplicar clase al div
-
+      containerDiv.className = "relative w-full h-48";
       // Crear el elemento video
       const videoElement = document.createElement('video');
       videoElement.autoplay = true;
       videoElement.muted = true;
       videoElement.srcObject = this.localStream;
       videoElement.playsInline = true;
-      videoElement.className = 'bg-white rounded-lg w-full h-full';
+      videoElement.className = 'absolute inset-0 w-full h-full object-cover rounded-full shadow-md';
 
       // Añadir el video al div
       containerDiv.appendChild(videoElement);
@@ -170,21 +180,21 @@ export class HomeComponent {
 
     if(!this.listUUIDS[data.from].video || !this.listUUIDS[data.from].video){
       // Verificar el tipo de track y manejarlo adecuadamente
-      this.remoteStream = event.streams[0];
+      let remoteStream = event.streams[0];
       if (!this.audioContext) {
         this.audioContext = new AudioContext();
       }
   
       // Crear el elemento div contenedor
       const containerDiv = document.createElement('div');
-      containerDiv.className = 'bg-white rounded-lg w-full h-full'; // Aplicar clase al div
+      containerDiv.className = "relative w-full h-48";
   
       // Crear el elemento video
       const videoElement = document.createElement('video');
       videoElement.autoplay = true;
       videoElement.playsInline = true;
-      videoElement.srcObject = this.remoteStream;
-      videoElement.className = 'rounded-lg w-full h-full';
+      videoElement.srcObject = remoteStream;
+      videoElement.className = 'absolute inset-0 w-full h-full object-cover rounded-full shadow-md';
   
       // Añadir el video al div
       containerDiv.appendChild(videoElement);
@@ -203,7 +213,6 @@ export class HomeComponent {
     // Crear una nueva RTCPeerConnection solo si no existe una para este UUID
     this.rtcPeerConnection = new RTCPeerConnection(this.iceServers);
     this.addLocalTracks();
-    // this.rtcPeerConnection.ontrack = this.setRemoteStream.bind(this,data);
     this.rtcPeerConnection.ontrack = (event:any) => this.setRemoteStream(event, data);
 
     this.rtcPeerConnection.onicecandidate = this.sendIceCandidate.bind(this);
@@ -270,7 +279,6 @@ export class HomeComponent {
       this.connection = true;
     } else {
       this.connection = false;
-      this.roomId = '';
       this.hiddenVideoConference();
     }
   }

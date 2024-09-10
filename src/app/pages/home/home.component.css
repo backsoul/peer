@@ -60,17 +60,24 @@ video{
    border:none;
 }
 
+.video-container {
+  position: relative;
+  width: 100%; /* Ocupa todo el ancho disponible del contenedor padre */
+  padding-top: 100%; /* Proporción 1:1 para mantener el contenedor cuadrado */
+  overflow: hidden; /* Asegura que el contenido no se desborde */
+}
 
-  .video-container video {
-    border-radius: 4px;
-  }
-  
-  .video-container{
-    background: #ffffff;
-    border-radius: 1rem;
-    width: 100%;
-    height: 100%;
-  }
+.video-container video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%; /* Hace que el video sea redondo */
+  box-shadow: 1px 1px 8px 1px #484848;
+}
+
 
 
   .progress-container {
