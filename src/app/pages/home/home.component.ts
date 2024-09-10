@@ -1,40 +1,49 @@
-import { Component, ElementRef, ViewChild } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  ViewChild,
+} from '@angular/core';
 
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
-  styleUrls: ['./home.component.css']
+  styleUrls: ['./home.component.css'],
 })
 export class HomeComponent {
   public micStatus: boolean = false;
   public speakerStatus: boolean = false;
   public connection: boolean = false;
-  public urlWS: string = "wss://walkie.lumisar.com/ws";
-  public urlWSSpeech: string = "wss://walkie.lumisar.com/ws-speech";
-  public listText: string[] = [];
-  @ViewChild('localVideo') localVideo!: ElementRef<HTMLVideoElement>;
-  @ViewChild('remoteVideo') remoteVideo!: ElementRef<HTMLVideoElement>;
+  public urlWS: string = 'wss://walkie.lumisar.com/ws';
+  @ViewChild('audioProgress') audioProgress!: ElementRef;
+  @ViewChild('videoContainer') videoContainer!: ElementRef;
+  audioProgressBars: Map<string, HTMLDivElement> = new Map(); // Map para almacenar barras de progreso por stream
+
   localStream: any;
+  remoteStream: any;
   isRoomCreator = false;
   rtcPeerConnection: any;
   showRoomSelection: boolean = true;
   videoChatContainer: boolean = false;
   mediaConstraints = {
-    video: false,
-    audio: true
+    video: true,
+    audio: true,
   };
   iceServers = {
     iceServers: [
       {
-        urls: 'stun:stun.l.google.com:19302'
-      }
-    ]
+        urls: 'stun:stun.l.google.com:19302',
+      },
+    ],
   };
   ws: any;
   roomId: any;
-
-  constructor() {}
-
+  audioContext: AudioContext | null = null;
+  analyser: AnalyserNode | null = null;
+  dataArray: Uint8Array | null = null;
+  constructor(private cdr: ChangeDetectorRef) {}
+  ngAfterViewInit() {
+  }
   ngOnInit() {
     this.ws = new WebSocket(this.urlWS);
     this.ws.onopen = () => {
@@ -52,31 +61,33 @@ export class HomeComponent {
           await this.setLocalStream(this.mediaConstraints);
           this.sendStartCall(this.roomId);
           break;
-        case 'full_room':
-          alert('The room is full, please try another one');
-          break;
+        // case 'full_room':
+        //   alert('The room is full, please try another one');
+        //   break;
         case 'start_call':
-          if (this.isRoomCreator) {
-            this.createPeerConnection();
-            await this.createOffer();
-          }
+          this.createPeerConnection();
+          await this.createOffer();
           break;
         case 'webrtc_offer':
           if (!this.isRoomCreator) {
             this.createPeerConnection();
-            console.log('webrtc_offer', data.sdp)
-            this.rtcPeerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            console.log('webrtc_offer', data.sdp);
+            this.rtcPeerConnection.setRemoteDescription(
+              new RTCSessionDescription(data.sdp)
+            );
             await this.createAnswer();
           }
           break;
         case 'webrtc_answer':
-           console.log('webrtc_offer', data.sdp)
-          this.rtcPeerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+          console.log('webrtc_offer', data.sdp);
+          this.rtcPeerConnection.setRemoteDescription(
+            new RTCSessionDescription(data.sdp)
+          );
           break;
         case 'webrtc_ice_candidate':
           const candidate = new RTCIceCandidate({
             sdpMLineIndex: data.label,
-            candidate: data.candidate
+            candidate: data.candidate,
           });
           this.rtcPeerConnection.addIceCandidate(candidate);
           break;
@@ -86,14 +97,34 @@ export class HomeComponent {
     };
   }
 
-  sendStartCall(roomId:any) {
+  sendStartCall(roomId: any) {
     this.ws.send(JSON.stringify({ type: 'start_call', roomId }));
   }
 
   async setLocalStream(mediaConstraints: any) {
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-      this.localVideo.nativeElement.srcObject = this.localStream;
+      this.localStream = await navigator.mediaDevices.getUserMedia(
+        mediaConstraints
+      );
+      // Crear el elemento div
+      const containerDiv = document.createElement('div');
+      containerDiv.className = 'bg-white rounded-lg w-full h-full'; // Aplicar clase al div
+
+      // Crear el elemento video
+      const videoElement = document.createElement('video');
+      videoElement.autoplay = true;
+      videoElement.muted = true;
+      videoElement.srcObject = this.localStream;
+      videoElement.className = 'bg-white rounded-lg w-full h-full';
+
+      // Añadir el video al div
+      containerDiv.appendChild(videoElement);
+
+      // Añadir el div al contenedor
+      this.videoContainer.nativeElement.appendChild(containerDiv);
+
+      // Forzar la actualización de cambios
+      this.cdr.detectChanges();
     } catch (error) {
       console.error('Could not get user media', error);
     }
@@ -107,20 +138,24 @@ export class HomeComponent {
   }
 
   addLocalTracks() {
-    this.localStream.getTracks().forEach((track: any) => {
-      this.rtcPeerConnection.addTrack(track, this.localStream);
-    });
+    if (this.localStream) {
+      this.localStream.getTracks().forEach((track: any) => {
+        this.rtcPeerConnection.addTrack(track, this.localStream);
+      });
+    }
   }
 
   async createOffer() {
     try {
       const sessionDescription = await this.rtcPeerConnection.createOffer();
       await this.rtcPeerConnection.setLocalDescription(sessionDescription);
-      this.ws.send(JSON.stringify({
-        type: 'webrtc_offer',
-        sdp: sessionDescription,
-        roomId: this.roomId
-      }));
+      this.ws.send(
+        JSON.stringify({
+          type: 'webrtc_offer',
+          sdp: sessionDescription,
+          roomId: this.roomId,
+        })
+      );
     } catch (error) {
       console.error('Error creating offer', error);
     }
@@ -130,28 +165,86 @@ export class HomeComponent {
     try {
       const sessionDescription = await this.rtcPeerConnection.createAnswer();
       await this.rtcPeerConnection.setLocalDescription(sessionDescription);
-      this.ws.send(JSON.stringify({
-        type: 'webrtc_answer',
-        sdp: sessionDescription,
-        roomId: this.roomId
-      }));
+      this.ws.send(
+        JSON.stringify({
+          type: 'webrtc_answer',
+          sdp: sessionDescription,
+          roomId: this.roomId,
+        })
+      );
     } catch (error) {
       console.error('Error creating answer', error);
     }
   }
 
   setRemoteStream(event: any) {
-    this.remoteVideo.nativeElement.srcObject = event.streams[0];
+    this.remoteStream = event.streams[0];
+  
+    if (!this.audioContext) {
+      this.audioContext = new AudioContext();
+    }
+  
+    // Crear el elemento div contenedor
+    const containerDiv = document.createElement('div');
+    containerDiv.className = 'bg-white rounded-lg w-full h-full'; // Aplicar clase al div
+  
+    // Crear el elemento video
+    const videoElement = document.createElement('video');
+    videoElement.autoplay = true;
+    videoElement.playsInline = true;
+    videoElement.srcObject = this.remoteStream;
+  
+    // Añadir el video al div
+    containerDiv.appendChild(videoElement);
+  
+    // Crear el contenedor de la barra de progreso
+    const progressContainer = document.createElement('div');
+    
+    // Estilos aplicados directamente desde TypeScript
+    progressContainer.style.width = '20%';
+    progressContainer.style.height = '10px';
+    progressContainer.style.borderRadius = '10px';
+    progressContainer.style.marginTop = '1rem';
+  
+    // Crear la barra de progreso
+    const progressBar = document.createElement('div');
+  
+    // Estilos aplicados directamente desde TypeScript
+    progressBar.style.height = '100%';
+    progressBar.style.width = '0%'; // Inicialmente en 0%
+    progressBar.style.backgroundColor = '#4caf50';
+    progressBar.style.borderRadius = '10px';
+  
+    // Añadir la barra de progreso al contenedor
+    progressContainer.appendChild(progressBar);
+  
+    // Añadir el contenedor de progreso al contenedor principal
+    containerDiv.appendChild(progressContainer);
+  
+    // Añadir el contenedor principal al DOM
+    this.videoContainer.nativeElement.appendChild(containerDiv);
+  
+    // Almacenar la referencia de la barra de progreso
+    const streamId = this.remoteStream.id;
+    this.audioProgressBars.set(streamId, progressBar); // Guardamos la barra con el ID del stream
+  
+    // Forzar la actualización de cambios
+    this.cdr.detectChanges();
+  
+    // Configurar el stream de audio para visualización
+    this.initAudioProcessing(this.remoteStream, streamId); // Pasamos el stream y su ID
   }
 
   sendIceCandidate(event: any) {
     if (event.candidate) {
-      this.ws.send(JSON.stringify({
-        type: 'webrtc_ice_candidate',
-        roomId: this.roomId,
-        label: event.candidate.sdpMLineIndex,
-        candidate: event.candidate.candidate
-      }));
+      this.ws.send(
+        JSON.stringify({
+          type: 'webrtc_ice_candidate',
+          roomId: this.roomId,
+          label: event.candidate.sdpMLineIndex,
+          candidate: event.candidate.candidate,
+        })
+      );
     }
   }
 
@@ -167,5 +260,36 @@ export class HomeComponent {
   showVideoConference() {
     this.showRoomSelection = false;
     this.videoChatContainer = true;
+  }
+
+  initAudioProcessing(stream: any, streamId: string) {
+    if (this.audioContext && stream) {
+      const source = this.audioContext.createMediaStreamSource(stream);
+      this.analyser = this.audioContext.createAnalyser();
+      source.connect(this.analyser);
+      this.analyser.fftSize = 2048;
+      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+  
+      // Iniciar el proceso de actualización de la barra de progreso
+      this.updateProgressBar(streamId);
+    }
+  }
+  
+  updateProgressBar(streamId: string) {
+    if (this.audioContext && this.analyser && this.dataArray) {
+      this.analyser.getByteFrequencyData(this.dataArray);
+  
+      const sum = this.dataArray.reduce((a, b) => a + b, 0);
+      const average = sum / this.dataArray.length;
+      const progress = (average / 255) * 1000; // Se calcula el progreso en %
+  
+      const progressBar = this.audioProgressBars.get(streamId);
+  
+      if (progressBar) {
+        progressBar.style.width = `${progress}%`; // Actualizar el ancho de la barra de progreso
+      }
+  
+      requestAnimationFrame(() => this.updateProgressBar(streamId));
+    }
   }
 }

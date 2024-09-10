@@ -46,31 +46,23 @@
       -webkit-backdrop-filter: blur(8.2px);
     "
   >
-    <div style="height: 100%; width: 100%;" class="flex flex-col">
-      <div style="width: 100%;    padding: 2rem;" class="lg:col-span-6 col-span-8">
-        <div style="    display: grid;
-        width: 100%;
-        gap: 1rem;
-        grid-template-columns: 1fr 1fr;" class="">
-          <video id="local-video" #localVideo autoplay muted="muted"></video>
-          <video id="remote-video" #remoteVideo autoplay="autoplay"></video>
+    <div style="height: 100%; width: 100%" class="flex flex-col">
+      <div style="width: 100%; padding: 2rem" class="lg:col-span-6 col-span-8">
+        <div
+          style="
+            display: grid;
+            width: 100%;
+            gap: 1rem;
+            grid-template-columns: 1fr 1fr;
+          "
+          class=""
+          #videoContainer
+        >
         </div>
-        <!-- <div style="    display: flex;
-        justify-content: center;
-        align-items: end;
-        width: 100%;
-        margin-top: 1rem;
-        background: #4e4e4e;
-        border-radius: 1rem;
-        padding: 1rem;
-        color: white;
-        font-weight: 600;" *ngIf="lastestText">
-            <h2>{{lastestText}}</h2>
-        </div> -->
       </div>
 
       <div
-        style="height: 100%; width: 100%;    padding: 1rem;"
+        style="height: 100%; width: 100%; padding: 1rem"
         class="lg:col-span-2 col-span-8 flex flex-col justify-end items-end lg:flex lg:justify-end lg:items-start"
       >
         <div
@@ -110,7 +102,7 @@
               class="col-span-4"
             />
             <div
-            (click)="joinRoom()"
+              (click)="joinRoom()"
               class="col-span-4 cursor-pointer grid grid-cols-4"
               [ngClass]="{
                 'btn-connection': !connection,
