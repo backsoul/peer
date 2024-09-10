@@ -55,3 +55,9 @@
     width: 0;
     height: 0;
 }
+
+video{
+    border-radius: 3rem;
+    background-color: #00d9c0;
+       width: 100%;
+}

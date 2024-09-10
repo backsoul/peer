@@ -39,7 +39,6 @@
     style="
       width: 70%;
       height: 80%;
-      padding: 1rem;
       background: rgba(255, 255, 255, 0.35);
       border-radius: 16px;
       box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
@@ -47,44 +46,16 @@
       -webkit-backdrop-filter: blur(8.2px);
     "
   >
-    <div style="height: 100%; width: 100%" class="grid grid-cols-8 gap-5">
-      <div style="width: 100%" class="lg:col-span-6 col-span-8">
-        <div
-          style="
-            width: 6rem;
-            height: 6rem;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            gap: 0.3rem;
-
-            border-radius: 1rem;
-            padding: 1rem 0rem;
-          "
-          class="client-container"
-        >
-          <h1 style="color: white; font-weight: 600">BOB</h1>
-          <svg
-            class="w-6 h-6 text-gray-800 text-white"
-            aria-hidden="true"
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            fill="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M5 8a1 1 0 0 1 1 1v3a4.006 4.006 0 0 0 4 4h4a4.006 4.006 0 0 0 4-4V9a1 1 0 1 1 2 0v3.001A6.006 6.006 0 0 1 14.001 18H13v2h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2H9.999A6.006 6.006 0 0 1 4 12.001V9a1 1 0 0 1 1-1Z"
-              clip-rule="evenodd"
-            />
-            <path
-              d="M7 6a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v5a4 4 0 0 1-4 4h-2a4 4 0 0 1-4-4V6Z"
-            />
-          </svg>
+    <div style="height: 100%; width: 100%;" class="flex flex-col">
+      <div style="width: 100%;    padding: 2rem;" class="lg:col-span-6 col-span-8">
+        <div style="    display: grid;
+        width: 100%;
+        gap: 1rem;
+        grid-template-columns: 1fr 1fr;" class="">
+          <video id="local-video" #localVideo autoplay muted="muted"></video>
+          <video id="remote-video" #remoteVideo autoplay="autoplay"></video>
         </div>
-        <div style="    display: flex;
+        <!-- <div style="    display: flex;
         justify-content: center;
         align-items: end;
         width: 100%;
@@ -95,12 +66,12 @@
         color: white;
         font-weight: 600;" *ngIf="lastestText">
             <h2>{{lastestText}}</h2>
-        </div>
+        </div> -->
       </div>
 
       <div
-        style="height: 100%; width: 100%"
-        class="lg:col-span-2 col-span-8 flex flex-col justify-end items-end lg:flex lg:justify-start lg:items-start"
+        style="height: 100%; width: 100%;    padding: 1rem;"
+        class="lg:col-span-2 col-span-8 flex flex-col justify-end items-end lg:flex lg:justify-end lg:items-start"
       >
         <div
           style="
@@ -109,6 +80,7 @@
             height: fit-content;
             width: 100%;
           "
+          *ngIf="showRoomSelection"
           [ngClass]="{ 'bg-connection': connection, 'bg-close': !connection }"
         >
           <h1
@@ -124,7 +96,7 @@
           <div class="grid grid-cols-4 gap-2">
             <input
               type="text"
-              [(ngModel)]="urlWS"
+              [(ngModel)]="roomId"
               name="url"
               id=""
               placeholder="room url"
@@ -138,12 +110,12 @@
               class="col-span-4"
             />
             <div
+            (click)="joinRoom()"
               class="col-span-4 cursor-pointer grid grid-cols-4"
               [ngClass]="{
                 'btn-connection': !connection,
                 'btn-close': connection
               }"
-              (click)="openConnection()"
               style="
                 justify-content: center;
                 align-items: center;
@@ -182,7 +154,6 @@
                 </svg>
                 <svg
                   *ngIf="connection"
-                  (click)="closeConnection()"
                   class="w-8 h-8 bg-red-800 text-white rounded-sm p-1 cursor-pointer"
                   aria-hidden="true"
                   xmlns="http://www.w3.org/2000/svg"
@@ -218,7 +189,7 @@
             bottom: 1rem;
           "
         >
-          <div class="button-class" (click)="changeMicStatus()">
+          <div class="button-class">
             <div style="cursor: pointer">
               <svg
                 *ngIf="micStatus"
@@ -256,7 +227,7 @@
             </div>
           </div>
 
-          <div class="button-class" (click)="changeSpeakerStatus()">
+          <div class="button-class">
             <svg
               *ngIf="speakerStatus"
               class="w-6 h-6 text-gray-800 text-white"
