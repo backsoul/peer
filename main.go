@@ -29,7 +29,7 @@ func main() {
 
 	port := "3000"
 	fmt.Printf("Server listening on port %s\n", port)
-	if err := http.ListenAndServeTLS(":"+port, "localhost.crt", "localhost.key", nil); err != nil {
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
 }
