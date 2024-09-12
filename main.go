@@ -120,10 +120,11 @@ func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 	room[connection.conn] = connection.clientUUID
 	mu.Unlock() // Desbloquear
 
-	// connection.send <- encodeJSON(map[string]interface{}{
-	// 	"type":   messageType,
-	// 	"roomId": roomID,
-	// })
+	connection.send <- encodeJSON(map[string]interface{}{
+		"type":   messageType,
+		"roomId": roomID,
+		"uuid":   connection.clientUUID,
+	})
 
 	broadcast(roomID, map[string]interface{}{
 		"type": messageType,
