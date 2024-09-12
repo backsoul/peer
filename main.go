@@ -22,6 +22,8 @@ type Connection struct {
 	conn       *websocket.Conn
 	send       chan []byte
 	clientUUID string
+	cameraOn   bool // Estado de la cámara
+	audioOn    bool // Estado de la cámara
 }
 
 func main() {
@@ -111,6 +113,19 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 	roomID, _ := data["roomId"].(string)
 	messageType, _ := data["type"].(string)
+
+	// Actualizar el estado de la cámara según el mensaje recibido
+	switch messageType {
+	case "video_on_remote":
+		connection.cameraOn = true
+	case "video_off_remote":
+		connection.cameraOn = false
+	case "mic_on_remote":
+		connection.audioOn = true
+	case "mic_off_remote":
+		connection.audioOn = false
+	}
+
 	mu.Lock() // Bloquear el acceso concurrente a rooms
 	room, exists := rooms[roomID]
 	if !exists {
@@ -120,14 +135,19 @@ func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 	room[connection.conn] = connection.clientUUID
 	mu.Unlock() // Desbloquear
 
+	// Enviar el estado actualizado de la cámara al cliente
 	connection.send <- encodeJSON(map[string]interface{}{
-		"type":   messageType,
-		"roomId": roomID,
-		"uuid":   connection.clientUUID,
+		"type":     messageType,
+		"roomId":   roomID,
+		"uuid":     connection.clientUUID,
+		"cameraOn": connection.cameraOn, // Incluir el estado de la cámara
 	})
 
+	// Difundir el nuevo estado de la cámara a los otros clientes de la sala
 	broadcast(roomID, map[string]interface{}{
-		"type": messageType,
+		"type":     messageType,
+		"uuid":     connection.clientUUID,
+		"cameraOn": connection.cameraOn, // Incluir el estado de la cámara
 	}, connection.clientUUID)
 }
 
