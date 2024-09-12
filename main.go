@@ -197,11 +197,6 @@ func handleJoin(connection *Connection, data map[string]interface{}) {
 		rooms[roomID] = room
 	}
 
-	if len(room) == 0 {
-		room = make(map[*websocket.Conn]string)
-		rooms[roomID] = room
-	}
-
 	room[connection.conn] = connection.clientUUID
 	mu.Unlock() // Desbloquear
 
