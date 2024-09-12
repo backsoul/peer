@@ -141,6 +141,7 @@ func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 		"roomId":   roomID,
 		"uuid":     connection.clientUUID,
 		"cameraOn": connection.cameraOn, // Incluir el estado de la cámara
+		"audioOn":  connection.audioOn,
 	})
 
 	// Difundir el nuevo estado de la cámara a los otros clientes de la sala
@@ -148,6 +149,7 @@ func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 		"type":     messageType,
 		"uuid":     connection.clientUUID,
 		"cameraOn": connection.cameraOn, // Incluir el estado de la cámara
+		"audioOn":  connection.audioOn,
 	}, connection.clientUUID)
 }
 
