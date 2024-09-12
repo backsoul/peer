@@ -204,8 +204,7 @@ func handleJoin(connection *Connection, data map[string]interface{}) {
 			"type":   "room_created",
 			"roomId": roomID,
 		})
-	}
-	if len(room) > 1 {
+	} else {
 		connection.send <- encodeJSON(map[string]interface{}{
 			"type":   "room_joined",
 			"roomId": roomID,
