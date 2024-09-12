@@ -34,6 +34,7 @@ func main() {
 	}
 }
 
+// TODO: connection not is necesary send room,backend could calculate and asign.
 func handleConnection(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -97,12 +98,36 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 		case "close_call":
 			roomID, _ = data["roomId"].(string) // Almacenar el roomID cuando se une
 			handleClientDisconnect(roomID, connection)
-		case "start_call", "webrtc_offer", "webrtc_answer", "webrtc_ice_candidate", "mic_on_remote", "mic_off_remote", "video_on_remote", "video_off_remote":
+		case "start_call", "webrtc_offer", "webrtc_answer", "webrtc_ice_candidate":
 			handleRoomMessage(data, connection)
+		case "mic_on_remote", "mic_off_remote", "video_on_remote", "video_off_remote":
+			handleDevicesStatus(connection, data)
 		default:
 			log.Printf("Unknown message type: %s\n", messageType)
 		}
 	}
+}
+
+func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
+	roomID, _ := data["roomId"].(string)
+	messageType, _ := data["type"].(string)
+	mu.Lock() // Bloquear el acceso concurrente a rooms
+	room, exists := rooms[roomID]
+	if !exists {
+		room = make(map[*websocket.Conn]string)
+		rooms[roomID] = room
+	}
+	room[connection.conn] = connection.clientUUID
+	mu.Unlock() // Desbloquear
+
+	// connection.send <- encodeJSON(map[string]interface{}{
+	// 	"type":   messageType,
+	// 	"roomId": roomID,
+	// })
+
+	broadcast(roomID, map[string]interface{}{
+		"type": messageType,
+	}, connection.clientUUID)
 }
 
 // Función para manejar la desconexión del cliente y notificar a los demás
