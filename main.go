@@ -199,7 +199,8 @@ func handleJoin(connection *Connection, data map[string]interface{}) {
 
 	room[connection.conn] = connection.clientUUID
 	mu.Unlock() // Desbloquear
-
+	fmt.Println("room - handleJoin: ", room)
+	fmt.Println("room - data: ", data)
 	if len(room) == 1 {
 		connection.send <- encodeJSON(map[string]interface{}{
 			"type":   "room_created",
