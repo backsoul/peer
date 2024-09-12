@@ -94,7 +94,10 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 		case "join":
 			roomID, _ = data["roomId"].(string) // Almacenar el roomID cuando se une
 			handleJoin(connection, data)
-		case "start_call", "webrtc_offer", "webrtc_answer", "webrtc_ice_candidate":
+		case "close_call":
+			roomID, _ = data["roomId"].(string) // Almacenar el roomID cuando se une
+			handleClientDisconnect(roomID, connection)
+		case "start_call", "webrtc_offer", "webrtc_answer", "webrtc_ice_candidate", "mic_on_remote", "mic_off_remote", "video_on_remote", "video_off_remote":
 			handleRoomMessage(data, connection)
 		default:
 			log.Printf("Unknown message type: %s\n", messageType)
