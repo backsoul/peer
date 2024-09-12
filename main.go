@@ -61,9 +61,19 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 		"uuid": clientUUID,
 	})
 
+	var roomID string // Variable para almacenar el roomID del cliente
+
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
+			if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+				log.Printf("Client disconnected: %s\n", clientUUID)
+				if roomID != "" {
+					// Enviar el mensaje de cierre de llamada a los otros clientes
+					handleClientDisconnect(roomID, connection)
+				}
+				break
+			}
 			log.Println("Error while reading message:", err)
 			break
 		}
@@ -82,13 +92,36 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 
 		switch messageType {
 		case "join":
+			roomID, _ = data["roomId"].(string) // Almacenar el roomID cuando se une
 			handleJoin(connection, data)
 		case "start_call", "webrtc_offer", "webrtc_answer", "webrtc_ice_candidate":
 			handleRoomMessage(data, connection)
-		case "close 1001 (going away)":
-			log.Printf("client disconnected: %s\n", data)
 		default:
 			log.Printf("Unknown message type: %s\n", messageType)
+		}
+	}
+}
+
+// Función para manejar la desconexión del cliente y notificar a los demás
+func handleClientDisconnect(roomID string, connection *Connection) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	room, exists := rooms[roomID]
+	if exists {
+		// Eliminar al cliente del room
+		delete(room, connection.conn)
+
+		// Enviar un mensaje a los demás clientes de la sala notificando la desconexión
+		if len(room) > 0 {
+			broadcast(roomID, map[string]interface{}{
+				"type":   "close_call",
+				"uuid":   connection.clientUUID,
+				"roomId": roomID,
+			}, connection.clientUUID)
+		} else {
+			// Si no quedan más clientes, eliminar la sala
+			delete(rooms, roomID)
 		}
 	}
 }
