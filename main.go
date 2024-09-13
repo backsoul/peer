@@ -15,16 +15,15 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-var rooms = make(map[string]map[*websocket.Conn]*Connection) // map connection to Connection struct
-var mu sync.Mutex                                            // Mutex para proteger el acceso a rooms
+var rooms = make(map[string]map[*websocket.Conn]string) // map connection to UUID
+var mu sync.Mutex                                       // Mutex para proteger el acceso a rooms
 
 type Connection struct {
 	conn       *websocket.Conn
 	send       chan []byte
 	clientUUID string
-	cameraOn   bool       // Estado de la cámara
-	audioOn    bool       // Estado del micrófono
-	mu         sync.Mutex // Mutex para proteger el acceso a la conexión individual
+	cameraOn   bool // Estado de la cámara
+	audioOn    bool // Estado de la cámara
 }
 
 func main() {
@@ -37,6 +36,7 @@ func main() {
 	}
 }
 
+// TODO: connection not is necesary send room,backend could calculate and asign.
 func handleConnection(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -48,14 +48,14 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 	clientUUID := uuid.New().String() // Genera un UUID para el cliente
 	fmt.Println("Client connected with UUID:", clientUUID)
 
+	// Crea la estructura Connection con un canal de escritura
 	connection := &Connection{
 		conn:       conn,
-		send:       make(chan []byte, 256),
+		send:       make(chan []byte, 256), // Canal bufferizado para escribir mensajes
 		clientUUID: clientUUID,
-		cameraOn:   false, // Inicializar en false
-		audioOn:    false, // Inicializar en false
 	}
 
+	// Lanzar una goroutine que escuche el canal de send y escriba en el WebSocket
 	go handleWrites(connection)
 
 	// Enviar el UUID al cliente
@@ -64,14 +64,17 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 		"uuid": clientUUID,
 	})
 
-	var roomID string
+	var roomID string // Variable para almacenar el roomID del cliente
 
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
 				log.Printf("Client disconnected: %s\n", clientUUID)
-				handleClientDisconnect(roomID, connection)
+				if roomID != "" {
+					// Enviar el mensaje de cierre de llamada a los otros clientes
+					handleClientDisconnect(roomID, connection)
+				}
 				break
 			}
 			log.Println("Error while reading message:", err)
@@ -89,28 +92,30 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 			log.Println("Invalid message format")
 			continue
 		}
-
+		fmt.Println("messageType: %s data: ", messageType, data)
 		switch messageType {
 		case "join":
-			roomID = handleJoin(connection, data)
+			roomID, _ = data["roomId"].(string) // Almacenar el roomID cuando se une
+			handleJoin(connection, data)
 		case "close_call":
+			roomID, _ = data["roomId"].(string) // Almacenar el roomID cuando se une
 			handleClientDisconnect(roomID, connection)
 		case "start_call", "webrtc_offer", "webrtc_answer", "webrtc_ice_candidate":
 			handleRoomMessage(data, connection)
 		case "mic_on_remote", "mic_off_remote", "video_on_remote", "video_off_remote":
-			handleDevicesStatus(roomID, connection, data)
+			handleDevicesStatus(connection, data)
 		default:
 			log.Printf("Unknown message type: %s\n", messageType)
 		}
 	}
 }
 
-func handleDevicesStatus(roomID string, connection *Connection, data map[string]interface{}) {
-	connection.mu.Lock()
-	defer connection.mu.Unlock()
+func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
+	roomID, _ := data["roomId"].(string)
+	messageType, _ := data["type"].(string)
 
 	// Actualizar el estado de la cámara y micrófono según el mensaje recibido
-	switch data["type"].(string) {
+	switch messageType {
 	case "video_on_remote":
 		connection.cameraOn = true
 	case "video_off_remote":
@@ -121,29 +126,49 @@ func handleDevicesStatus(roomID string, connection *Connection, data map[string]
 		connection.audioOn = false
 	}
 
+	mu.Lock() // Bloquear el acceso concurrente a rooms
+	room, exists := rooms[roomID]
+	if !exists {
+		room = make(map[*websocket.Conn]string)
+		rooms[roomID] = room
+	}
+	room[connection.conn] = connection.clientUUID
+	mu.Unlock() // Desbloquear
+
+	// Log para verificar el estado antes de enviar
+	fmt.Printf("Sending update to client %s: cameraOn=%t, audioOn=%t\n", connection.clientUUID, connection.cameraOn, connection.audioOn)
+
 	// Difundir el nuevo estado a los otros clientes de la sala
+	fmt.Println("Broadcasting updated state to other clients in the room")
 	broadcast(roomID, map[string]interface{}{
-		"type":     data["type"],
+		"type":     messageType,
 		"uuid":     connection.clientUUID,
 		"cameraOn": connection.cameraOn,
 		"audioOn":  connection.audioOn,
 	}, connection.clientUUID)
 }
 
-func handleJoin(connection *Connection, data map[string]interface{}) string {
-	roomID := data["roomId"].(string)
+func handleJoin(connection *Connection, data map[string]interface{}) {
+	fmt.Println("entry join handle")
+	roomID, _ := data["roomId"].(string)
+	fmt.Println("entry join handle - roomID", roomID)
+
+	// Bloquea solo la parte necesaria para acceder a `rooms`
+	var room map[*websocket.Conn]string
+	var exists bool
 
 	mu.Lock()
-	defer mu.Unlock()
-
-	room, exists := rooms[roomID]
+	room, exists = rooms[roomID]
 	if !exists {
-		room = make(map[*websocket.Conn]*Connection)
+		room = make(map[*websocket.Conn]string)
 		rooms[roomID] = room
 	}
-	room[connection.conn] = connection
+	room[connection.conn] = connection.clientUUID
+	mu.Unlock()
 
-	// Notificar si la sala fue creada o si se unió
+	fmt.Println("room - handleJoin: ", room)
+
+	// Notificar al cliente si la sala fue creada o si se unió
 	if len(room) == 1 {
 		connection.send <- encodeJSON(map[string]interface{}{
 			"type":   "room_created",
@@ -154,39 +179,91 @@ func handleJoin(connection *Connection, data map[string]interface{}) string {
 			"type":   "room_joined",
 			"roomId": roomID,
 		})
-		// Notificar a los demás clientes que la llamada ha comenzado
+
+		// El manejo de la comunicación puede hacerse fuera del bloqueo
 		broadcast(roomID, map[string]interface{}{
 			"type": "start_call",
 		}, connection.clientUUID)
 	}
-
-	return roomID
 }
 
+// Función para manejar la desconexión del cliente y notificar a los demás
 func handleClientDisconnect(roomID string, connection *Connection) {
 	mu.Lock()
 	defer mu.Unlock()
 
 	room, exists := rooms[roomID]
 	if exists {
+		// Eliminar al cliente del room
 		delete(room, connection.conn)
 
-		// Notificar a los otros clientes sobre la desconexión
+		// Enviar un mensaje a los demás clientes de la sala notificando la desconexión
 		if len(room) > 0 {
 			broadcast(roomID, map[string]interface{}{
-				"type":   "client_disconnected",
+				"type":   "close_call",
 				"uuid":   connection.clientUUID,
 				"roomId": roomID,
 			}, connection.clientUUID)
 		} else {
+			// Si no quedan más clientes, eliminar la sala
 			delete(rooms, roomID)
+			fmt.Printf("Room %s eliminada por falta de clientes.\n", roomID)
+		}
+	}
+}
+
+func broadcast(roomID string, message map[string]interface{}, senderUUID string) {
+	mu.Lock() // Asegurarse de bloquear el acceso concurrente
+	defer mu.Unlock()
+
+	room, exists := rooms[roomID]
+	if !exists {
+		fmt.Println("Room does not exist")
+		return
+	}
+
+	// Recorremos los clientes en el room
+	for conn, clientUUID := range room {
+		// Evitar enviar el mensaje al mismo cliente que lo envió
+		if clientUUID == senderUUID {
+			continue
+		}
+
+		// Enviar el mensaje a los demás clientes
+		err := conn.WriteMessage(websocket.TextMessage, encodeJSON(message))
+		if err != nil {
+			fmt.Println("Error broadcasting message to client", clientUUID, ":", err)
+			// Cerrar y eliminar la conexión con problemas
+			conn.Close()
+			delete(room, conn)
+		} else {
+			fmt.Println("Message sent to client", clientUUID)
+		}
+	}
+
+	// Si la room quedó vacía después del broadcast, eliminarla
+	if len(room) == 0 {
+		delete(rooms, roomID)
+		fmt.Printf("Room %s eliminada porque quedó vacía.\n", roomID)
+	}
+}
+
+func handleWrites(c *Connection) {
+	defer func() {
+		close(c.send) // Asegurarse de cerrar el canal de envío cuando la conexión se cierra
+	}()
+
+	for msg := range c.send {
+		err := c.conn.WriteMessage(websocket.TextMessage, msg)
+		if err != nil {
+			log.Println("Error writing message:", err)
+			break
 		}
 	}
 }
 
 func handleRoomMessage(data map[string]interface{}, connection *Connection) {
-	roomID := data["roomId"].(string)
-
+	roomID, _ := data["roomId"].(string)
 	mu.Lock()
 	room, exists := rooms[roomID]
 	mu.Unlock()
@@ -194,48 +271,13 @@ func handleRoomMessage(data map[string]interface{}, connection *Connection) {
 	if exists {
 		for client, _ := range room {
 			if client != connection.conn {
-				data["from"] = connection.clientUUID
-				client.WriteMessage(websocket.TextMessage, encodeJSON(data))
+				message := data
+				message["from"] = connection.clientUUID // Añadir el UUID del remitente
+				message["audioOn"] = connection.audioOn
+				message["cameraOn"] = connection.cameraOn
+				rooms[roomID][client] = connection.clientUUID
+				client.WriteMessage(websocket.TextMessage, encodeJSON(message))
 			}
-		}
-	}
-}
-
-func broadcast(roomID string, message map[string]interface{}, senderUUID string) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	room, exists := rooms[roomID]
-	if !exists {
-		return
-	}
-
-	for client, conn := range room {
-		if conn.clientUUID == senderUUID {
-			continue
-		}
-		err := client.WriteMessage(websocket.TextMessage, encodeJSON(message))
-		if err != nil {
-			client.Close()
-			delete(room, client)
-		}
-	}
-
-	// Si la room está vacía, eliminarla
-	if len(room) == 0 {
-		delete(rooms, roomID)
-	}
-}
-
-func handleWrites(c *Connection) {
-	defer func() {
-		close(c.send)
-	}()
-
-	for msg := range c.send {
-		err := c.conn.WriteMessage(websocket.TextMessage, msg)
-		if err != nil {
-			break
 		}
 	}
 }
