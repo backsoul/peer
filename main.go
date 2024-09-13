@@ -176,7 +176,8 @@ func handleJoin(connection *Connection, data map[string]interface{}) {
 	fmt.Println("entry join handle")
 	roomID, _ := data["roomId"].(string)
 	fmt.Println("entry join handle - roomID", roomID)
-	// mu.Lock() // Bloquear el acceso concurrente a rooms
+	mu.Lock() // Bloquear el acceso concurrente a rooms
+	fmt.Println("entry join handle - after mu lock")
 	room, exists := rooms[roomID]
 	fmt.Println("room - len: ", len(room))
 	fmt.Println("room - exists: ", exists)
