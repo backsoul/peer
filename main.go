@@ -22,8 +22,9 @@ type Connection struct {
 	conn       *websocket.Conn
 	send       chan []byte
 	clientUUID string
-	cameraOn   bool // Estado de la cámara
-	audioOn    bool // Estado del micrófono
+	cameraOn   bool       // Estado de la cámara
+	audioOn    bool       // Estado del micrófono
+	mu         sync.Mutex // Mutex para proteger el acceso a la conexión individual
 }
 
 func main() {
@@ -105,8 +106,8 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDevicesStatus(roomID string, connection *Connection, data map[string]interface{}) {
-	mu.Lock()
-	defer mu.Unlock()
+	connection.mu.Lock()
+	defer connection.mu.Unlock()
 
 	// Actualizar el estado de la cámara y micrófono según el mensaje recibido
 	switch data["type"].(string) {
