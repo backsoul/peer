@@ -148,16 +148,15 @@ func handleJoin(connection *Connection, data map[string]interface{}) string {
 			"type":   "room_created",
 			"roomId": roomID,
 		})
-	} else {
-		connection.send <- encodeJSON(map[string]interface{}{
-			"type":   "room_joined",
-			"roomId": roomID,
-		})
-		// Notificar a los demás clientes que la llamada ha comenzado
-		broadcast(roomID, map[string]interface{}{
-			"type": "start_call",
-		}, connection.clientUUID)
 	}
+	connection.send <- encodeJSON(map[string]interface{}{
+		"type":   "room_joined",
+		"roomId": roomID,
+	})
+	// Notificar a los demás clientes que la llamada ha comenzado
+	broadcast(roomID, map[string]interface{}{
+		"type": "start_call",
+	}, connection.clientUUID)
 
 	return roomID
 }
