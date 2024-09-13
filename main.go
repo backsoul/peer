@@ -199,8 +199,9 @@ func handleClientDisconnect(roomID string, connection *Connection) {
 
 		// Enviar un mensaje a los demás clientes de la sala notificando la desconexión
 		if len(room) > 0 {
+			// Notificar a los otros clientes de la desconexión
 			broadcast(roomID, map[string]interface{}{
-				"type":   "close_call",
+				"type":   "client_disconnected",
 				"uuid":   connection.clientUUID,
 				"roomId": roomID,
 			}, connection.clientUUID)
