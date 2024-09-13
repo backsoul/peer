@@ -235,17 +235,29 @@ func handleRoomMessage(data map[string]interface{}, connection *Connection) {
 	}
 }
 
-func broadcast(roomID string, message map[string]interface{}, clientUUID string) {
-	mu.Lock()
-	room, exists := rooms[roomID]
-	mu.Unlock()
+func broadcast(roomID string, message map[string]interface{}, senderUUID string) {
+	mu.Lock() // Asegúrate de bloquear el acceso concurrente
+	defer mu.Unlock()
 
-	if exists {
-		for client, uuid := range room {
-			if uuid != clientUUID {
-				message["from"] = clientUUID // Incluir el UUID del remitente
-				client.WriteMessage(websocket.TextMessage, encodeJSON(message))
-			}
+	room, exists := rooms[roomID]
+	if !exists {
+		fmt.Println("Room does not exist")
+		return
+	}
+
+	// Recorremos los clientes en el room
+	for conn, clientUUID := range room {
+		// Evitar enviar el mensaje al mismo cliente que lo envió
+		if clientUUID == senderUUID {
+			continue
+		}
+
+		// Enviar el mensaje a los demás clientes
+		err := conn.WriteMessage(websocket.TextMessage, encodeJSON(message))
+		if err != nil {
+			fmt.Println("Error broadcasting message: ", err)
+			conn.Close()
+			delete(room, conn)
 		}
 	}
 }
