@@ -263,10 +263,10 @@ func broadcast(roomID string, message map[string]interface{}, senderUUID string)
 }
 
 func encodeJSON(data map[string]interface{}) []byte {
-	message, err := json.Marshal(data)
+	jsonData, err := json.Marshal(data)
 	if err != nil {
-		log.Println("Error marshaling JSON:", err)
+		log.Println("Error encoding JSON:", err)
 		return nil
 	}
-	return message
+	return jsonData
 }
