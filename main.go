@@ -177,16 +177,6 @@ func handleClientDisconnect(roomID string, connection *Connection) {
 	}
 }
 
-func handleWrites(c *Connection) {
-	for msg := range c.send {
-		err := c.conn.WriteMessage(websocket.TextMessage, msg)
-		if err != nil {
-			log.Println("Error writing message:", err)
-			break
-		}
-	}
-}
-
 func handleJoin(connection *Connection, data map[string]interface{}) {
 	roomID, _ := data["roomId"].(string)
 
@@ -201,6 +191,8 @@ func handleJoin(connection *Connection, data map[string]interface{}) {
 	mu.Unlock() // Desbloquear
 	fmt.Println("room - handleJoin: ", room)
 	fmt.Println("room - data: ", data)
+
+	// Notificar al cliente si la sala fue creada o si se unió
 	if len(room) == 1 {
 		connection.send <- encodeJSON(map[string]interface{}{
 			"type":   "room_created",
@@ -214,24 +206,6 @@ func handleJoin(connection *Connection, data map[string]interface{}) {
 		broadcast(roomID, map[string]interface{}{
 			"type": "start_call",
 		}, connection.clientUUID)
-	}
-}
-
-func handleRoomMessage(data map[string]interface{}, connection *Connection) {
-	roomID, _ := data["roomId"].(string)
-	mu.Lock()
-	room, exists := rooms[roomID]
-	mu.Unlock()
-
-	if exists {
-		for client, _ := range room {
-			if client != connection.conn {
-				message := data
-				message["from"] = connection.clientUUID // Añadir el UUID del remitente
-				rooms[roomID][client] = connection.clientUUID
-				client.WriteMessage(websocket.TextMessage, encodeJSON(message))
-			}
-		}
 	}
 }
 
@@ -258,6 +232,38 @@ func broadcast(roomID string, message map[string]interface{}, senderUUID string)
 			fmt.Println("Error broadcasting message: ", err)
 			conn.Close()
 			delete(room, conn)
+		}
+	}
+}
+
+func handleWrites(c *Connection) {
+	defer func() {
+		close(c.send) // Asegurarse de cerrar el canal de envío cuando la conexión se cierra
+	}()
+
+	for msg := range c.send {
+		err := c.conn.WriteMessage(websocket.TextMessage, msg)
+		if err != nil {
+			log.Println("Error writing message:", err)
+			break
+		}
+	}
+}
+
+func handleRoomMessage(data map[string]interface{}, connection *Connection) {
+	roomID, _ := data["roomId"].(string)
+	mu.Lock()
+	room, exists := rooms[roomID]
+	mu.Unlock()
+
+	if exists {
+		for client, _ := range room {
+			if client != connection.conn {
+				message := data
+				message["from"] = connection.clientUUID // Añadir el UUID del remitente
+				rooms[roomID][client] = connection.clientUUID
+				client.WriteMessage(websocket.TextMessage, encodeJSON(message))
+			}
 		}
 	}
 }
