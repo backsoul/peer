@@ -171,25 +171,25 @@ func handleClientDisconnect(roomID string, connection *Connection) {
 		}
 	}
 }
-
 func handleJoin(connection *Connection, data map[string]interface{}) {
 	fmt.Println("entry join handle")
 	roomID, _ := data["roomId"].(string)
 	fmt.Println("entry join handle - roomID", roomID)
-	mu.Lock() // Bloquear el acceso concurrente a rooms
-	fmt.Println("entry join handle - after mu lock")
-	room, exists := rooms[roomID]
-	fmt.Println("room - len: ", len(room))
-	fmt.Println("room - exists: ", exists)
+
+	// Bloquea solo la parte necesaria para acceder a `rooms`
+	var room map[*websocket.Conn]string
+	var exists bool
+
+	mu.Lock()
+	room, exists = rooms[roomID]
 	if !exists {
 		room = make(map[*websocket.Conn]string)
 		rooms[roomID] = room
 	}
-
 	room[connection.conn] = connection.clientUUID
-	mu.Unlock() // Desbloquear
+	mu.Unlock()
+
 	fmt.Println("room - handleJoin: ", room)
-	fmt.Println("room - data: ", data)
 
 	// Notificar al cliente si la sala fue creada o si se unió
 	if len(room) == 1 {
@@ -202,6 +202,8 @@ func handleJoin(connection *Connection, data map[string]interface{}) {
 			"type":   "room_joined",
 			"roomId": roomID,
 		})
+
+		// El manejo de la comunicación puede hacerse fuera del bloqueo
 		broadcast(roomID, map[string]interface{}{
 			"type": "start_call",
 		}, connection.clientUUID)
