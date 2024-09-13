@@ -138,15 +138,6 @@ func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 	// Log para verificar el estado antes de enviar
 	fmt.Printf("Sending update to client %s: cameraOn=%t, audioOn=%t\n", connection.clientUUID, connection.cameraOn, connection.audioOn)
 
-	// Enviar el estado actualizado al cliente que cambió el estado
-	connection.send <- encodeJSON(map[string]interface{}{
-		"type":     messageType,
-		"roomId":   roomID,
-		"uuid":     connection.clientUUID,
-		"cameraOn": connection.cameraOn,
-		"audioOn":  connection.audioOn,
-	})
-
 	// Difundir el nuevo estado a los otros clientes de la sala
 	fmt.Println("Broadcasting updated state to other clients in the room")
 	broadcast(roomID, map[string]interface{}{
