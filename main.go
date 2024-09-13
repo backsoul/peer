@@ -186,6 +186,8 @@ func handleJoin(connection *Connection, data map[string]interface{}) {
 
 	mu.Lock() // Bloquear el acceso concurrente a rooms
 	room, exists := rooms[roomID]
+	fmt.Println("room - len: ", len(room))
+	fmt.Println("room - exists: ", exists)
 	if !exists {
 		room = make(map[*websocket.Conn]string)
 		rooms[roomID] = room
