@@ -92,7 +92,7 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 			log.Println("Invalid message format")
 			continue
 		}
-
+		fmt.Println("messageType: %s data: ", messageType, data)
 		switch messageType {
 		case "join":
 			roomID, _ = data["roomId"].(string) // Almacenar el roomID cuando se une
