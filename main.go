@@ -270,6 +270,8 @@ func handleRoomMessage(data map[string]interface{}, connection *Connection) {
 			if client != connection.conn {
 				message := data
 				message["from"] = connection.clientUUID // Añadir el UUID del remitente
+				message["audioOn"] = connection.audioOn
+				message["cameraOn"] = connection.cameraOn
 				rooms[roomID][client] = connection.clientUUID
 				client.WriteMessage(websocket.TextMessage, encodeJSON(message))
 			}
