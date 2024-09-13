@@ -114,7 +114,7 @@ func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 	roomID, _ := data["roomId"].(string)
 	messageType, _ := data["type"].(string)
 
-	// Actualizar el estado de la cámara según el mensaje recibido
+	// Actualizar el estado de la cámara y micrófono según el mensaje recibido
 	switch messageType {
 	case "video_on_remote":
 		connection.cameraOn = true
@@ -135,20 +135,24 @@ func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 	room[connection.conn] = connection.clientUUID
 	mu.Unlock() // Desbloquear
 
-	// Enviar el estado actualizado de la cámara al cliente
+	// Log para verificar el estado antes de enviar
+	fmt.Printf("Sending update to client %s: cameraOn=%t, audioOn=%t\n", connection.clientUUID, connection.cameraOn, connection.audioOn)
+
+	// Enviar el estado actualizado al cliente que cambió el estado
 	connection.send <- encodeJSON(map[string]interface{}{
 		"type":     messageType,
 		"roomId":   roomID,
 		"uuid":     connection.clientUUID,
-		"cameraOn": connection.cameraOn, // Incluir el estado de la cámara
+		"cameraOn": connection.cameraOn,
 		"audioOn":  connection.audioOn,
 	})
 
-	// Difundir el nuevo estado de la cámara a los otros clientes de la sala
+	// Difundir el nuevo estado a los otros clientes de la sala
+	fmt.Println("Broadcasting updated state to other clients in the room")
 	broadcast(roomID, map[string]interface{}{
 		"type":     messageType,
 		"uuid":     connection.clientUUID,
-		"cameraOn": connection.cameraOn, // Incluir el estado de la cámara
+		"cameraOn": connection.cameraOn,
 		"audioOn":  connection.audioOn,
 	}, connection.clientUUID)
 }
@@ -210,7 +214,7 @@ func handleJoin(connection *Connection, data map[string]interface{}) {
 }
 
 func broadcast(roomID string, message map[string]interface{}, senderUUID string) {
-	mu.Lock() // Asegúrate de bloquear el acceso concurrente
+	mu.Lock() // Asegurarse de bloquear el acceso concurrente
 	defer mu.Unlock()
 
 	room, exists := rooms[roomID]
@@ -229,9 +233,12 @@ func broadcast(roomID string, message map[string]interface{}, senderUUID string)
 		// Enviar el mensaje a los demás clientes
 		err := conn.WriteMessage(websocket.TextMessage, encodeJSON(message))
 		if err != nil {
-			fmt.Println("Error broadcasting message: ", err)
+			fmt.Println("Error broadcasting message to client", clientUUID, ":", err)
+			// Cerrar y eliminar la conexión con problemas
 			conn.Close()
 			delete(room, conn)
+		} else {
+			fmt.Println("Message sent to client", clientUUID)
 		}
 	}
 }
