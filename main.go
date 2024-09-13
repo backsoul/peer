@@ -148,29 +148,6 @@ func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 	}, connection.clientUUID)
 }
 
-// Función para manejar la desconexión del cliente y notificar a los demás
-func handleClientDisconnect(roomID string, connection *Connection) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	room, exists := rooms[roomID]
-	if exists {
-		// Eliminar al cliente del room
-		delete(room, connection.conn)
-
-		// Enviar un mensaje a los demás clientes de la sala notificando la desconexión
-		if len(room) > 0 {
-			broadcast(roomID, map[string]interface{}{
-				"type":   "close_call",
-				"uuid":   connection.clientUUID,
-				"roomId": roomID,
-			}, connection.clientUUID)
-		} else {
-			// Si no quedan más clientes, eliminar la sala
-			delete(rooms, roomID)
-		}
-	}
-}
 func handleJoin(connection *Connection, data map[string]interface{}) {
 	fmt.Println("entry join handle")
 	roomID, _ := data["roomId"].(string)
@@ -210,6 +187,31 @@ func handleJoin(connection *Connection, data map[string]interface{}) {
 	}
 }
 
+// Función para manejar la desconexión del cliente y notificar a los demás
+func handleClientDisconnect(roomID string, connection *Connection) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	room, exists := rooms[roomID]
+	if exists {
+		// Eliminar al cliente del room
+		delete(room, connection.conn)
+
+		// Enviar un mensaje a los demás clientes de la sala notificando la desconexión
+		if len(room) > 0 {
+			broadcast(roomID, map[string]interface{}{
+				"type":   "close_call",
+				"uuid":   connection.clientUUID,
+				"roomId": roomID,
+			}, connection.clientUUID)
+		} else {
+			// Si no quedan más clientes, eliminar la sala
+			delete(rooms, roomID)
+			fmt.Printf("Room %s eliminada por falta de clientes.\n", roomID)
+		}
+	}
+}
+
 func broadcast(roomID string, message map[string]interface{}, senderUUID string) {
 	mu.Lock() // Asegurarse de bloquear el acceso concurrente
 	defer mu.Unlock()
@@ -237,6 +239,12 @@ func broadcast(roomID string, message map[string]interface{}, senderUUID string)
 		} else {
 			fmt.Println("Message sent to client", clientUUID)
 		}
+	}
+
+	// Si la room quedó vacía después del broadcast, eliminarla
+	if len(room) == 0 {
+		delete(rooms, roomID)
+		fmt.Printf("Room %s eliminada porque quedó vacía.\n", roomID)
 	}
 }
 
