@@ -113,7 +113,7 @@ func handleClientMessages(conn *websocket.Conn, connection *Connection) {
 			handleClientDisconnect(roomID, connection)
 		case "start_call", "webrtc_offer", "webrtc_answer", "webrtc_ice_candidate":
 			handleRoomMessage(data, connection)
-		case "mic_on_remote", "mic_off_remote", "video_on_remote", "video_off_remote":
+		case "mic_on_remote", "mic_off_remote", "video_on_remote", "video_off_remote", "transcript_text":
 			handleDevicesStatus(connection, data)
 		default:
 			log.Printf("Unknown message type: %s", messageType)
@@ -195,6 +195,7 @@ func notifyClient(connection *Connection, eventType, roomID string) {
 func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 	roomID := getRoomID(data)
 	messageType := data["type"].(string)
+	messageText := data["text"].(string)
 
 	updateDeviceStatus(connection, messageType)
 
@@ -204,6 +205,7 @@ func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 		"uuid":     connection.clientUUID,
 		"cameraOn": connection.cameraOn,
 		"audioOn":  connection.audioOn,
+		"message":  messageText,
 	}, connection.clientUUID)
 }
 
