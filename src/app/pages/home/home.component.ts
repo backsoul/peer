@@ -83,9 +83,13 @@ export class HomeComponent {
       this.ngZone.run(() => {
         for (let i = 0; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
-          this.transcriptTexts.push({ name: "bob", text: transcript });
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type:"transcript_text", roomId: this.roomId, text: transcript }));
+          }
+          this.transcriptTexts.push({ name: "Tu", text: transcript });
           console.log(transcript);
           console.log(this.transcriptTexts);
+          this.scrollToBottom();
         }
       });
       // Trigger change detection after updating transcriptTexts
@@ -195,6 +199,9 @@ export class HomeComponent {
   async handleWsMessage(event: any) {
     const data = JSON.parse(event.data);
     switch (data.type) {
+      case 'transcript_text':
+          this.transcriptTexts.push({ name: "Usuario", text: data.message })
+          break
       case 'uuid':
         this.uuid = data.uuid;
         break;
