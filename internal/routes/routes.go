@@ -214,7 +214,10 @@ func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 func handleTranscript(data map[string]interface{}, connection *Connection) {
 	roomID := getRoomID(data)
 	messageType := data["type"].(string)
-	messageText := data["text"].(string)
+	messageText, ok := data["text"].(string)
+	if !ok {
+		messageText = "" // O asignar un valor por defecto
+	}
 
 	updateDeviceStatus(connection, messageType)
 
