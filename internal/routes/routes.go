@@ -214,19 +214,23 @@ func handleTranscript(data map[string]interface{}, connection *Connection) {
 	messageType := data["type"].(string)
 	messageText, ok := data["text"].(string)
 	if !ok {
-		messageText = "" // O asignar un valor por defecto
+		messageText = "" // Asignar un valor por defecto si no está presente
 	}
 
+	// Actualizar el estado del dispositivo, aunque esto parece innecesario para transcripción
 	updateDeviceStatus(connection, messageType)
 
-	// room := getRoom(roomID)
-	broadcastToRoom(roomID, map[string]interface{}{
+	// Crear el mensaje que será retransmitido
+	message := map[string]interface{}{
 		"type":     messageType,
 		"uuid":     connection.clientUUID,
 		"cameraOn": connection.cameraOn,
 		"audioOn":  connection.audioOn,
-		"message":  messageText,
-	}, connection.clientUUID)
+		"message":  messageText, // Aquí se incluye el texto de la transcripción
+	}
+
+	// Retransmitir el mensaje a todos los clientes en la sala, excepto al que lo envió
+	broadcastToRoom(roomID, message, connection.clientUUID)
 }
 
 func updateDeviceStatus(connection *Connection, messageType string) {
