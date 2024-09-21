@@ -38,29 +38,55 @@ export class HomeComponent {
       },
     ],
   };
-  ws: any;
-  roomId: any;
+  ws!: WebSocket;
+  roomId: any = "1";
   audioContext: AudioContext | null = null;
   analyser: AnalyserNode | null = null;
   dataArray: Uint8Array | null = null;
+  connectionStatus: boolean = false;
   constructor(private cdr: ChangeDetectorRef) {}
   ngAfterViewInit() {}
   toggleMic(status: boolean) {
     this.micStatus = status;
     if (this.localStream) {
-      this.localStream.getAudioTracks().forEach((track: any) => {
-        track.enabled = this.micStatus;
-      });
+      if(this.localStream.getAudioTracks().length){
+        this.localStream.getAudioTracks().forEach((track: any) => {
+          track.enabled = this.micStatus;
+        });
+      }
+      if (this.ws.OPEN) {
+        if (this.micStatus) {
+          this.ws.send(
+            JSON.stringify({ type: 'mic_on_remote', roomId: this.roomId })
+          );
+        } else {
+          this.ws.send(
+            JSON.stringify({ type: 'mic_off_remote', roomId: this.roomId })
+          );
+        }
+      }
     }
   }
 
   toggleVideo(status: boolean) {
     this.videoStatus = status;
-    console.log('Micrófono:', this.videoStatus ? 'Activado' : 'Desactivado');
     if (this.localStream) {
-      this.localStream.getVideoTracks().forEach((track: any) => {
-        track.enabled = this.videoStatus;
-      });
+      if(this.localStream.getVideoTracks().length){
+        this.localStream.getVideoTracks().forEach((track: any) => {
+          track.enabled = this.videoStatus;
+        });
+      }
+      if (this.ws.OPEN) {
+        if (this.videoStatus) {
+          this.ws.send(
+            JSON.stringify({ type: 'video_on_remote', roomId: this.roomId })
+          );
+        } else {
+          this.ws.send(
+            JSON.stringify({ type: 'video_off_remote', roomId: this.roomId })
+          );
+        }
+      }
     }
   }
 
@@ -73,32 +99,33 @@ export class HomeComponent {
     }
   }
   ngOnInit() {
-   this.connectWebsocket();
- 
+    this.connectWebsocket();
+
   }
 
-  toggleDevices(status: boolean){
-    if(!status){
-      this.localStream.getVideoTracks().forEach((track: any) => {
-        track.stop();
-      });
-      this.localStream.getAudioTracks().forEach((track: any) => {
-        track.stop();
-      });
-    }
+  toggleDevices(status: boolean) {
     this.toggleMic(status);
     this.toggleSpeakerStatus(status);
     this.toggleVideo(status);
   }
 
-  connectWebsocket(){
-    this.ws = new WebSocket(this.urlWS);
+  connectWebsocket() {
+    try {
+      this.ws = new WebSocket(this.urlWS);
+    } catch (error) {
+      setTimeout(()=>{
+        this.connectWebsocket();
+      }, 3000)
+    }
+   
     this.ws.onopen = () => {
+      this.connectionStatus = true;
       console.log('Connected to WebSocket server');
     };
 
     this.ws.onmessage = async (event: any) => {
       const data = JSON.parse(event.data);
+      // console.log('on message: ', data);
       switch (data.type) {
         case 'room_created':
           await this.setLocalStream(this.mediaConstraints);
@@ -108,16 +135,29 @@ export class HomeComponent {
           await this.setLocalStream(this.mediaConstraints);
           this.sendStartCall(this.roomId);
           break;
-        // case 'full_room':
-        //   alert('The room is full, please try another one');
-        //   break;
+        case 'mic_on_remote':
+          this.toggleVideoOrAudioRemote(data);
+          console.log('mic_on_remote: ', data);
+          break;
+        case 'mic_off_remote':
+          this.toggleVideoOrAudioRemote(data);
+          console.log('mic_off_remote: ', data);
+          break;
+        case 'video_on_remote':
+          this.toggleVideoOrAudioRemote(data);
+          console.log('video_on_remote: ', data);
+          break;
+        case 'video_off_remote':
+          this.toggleVideoOrAudioRemote(data);
+          console.log('video_off_remote: ', data);
+          break;
         case 'start_call':
           console.log('start_call', data);
           this.createPeerConnection(data);
           await this.createOffer();
           break;
         case 'webrtc_offer':
-          console.log('webrtc_offer', data);
+          // console.log('webrtc_offer', data);
           this.createPeerConnection(data);
           this.rtcPeerConnection.setRemoteDescription(
             new RTCSessionDescription(data.sdp)
@@ -140,6 +180,30 @@ export class HomeComponent {
           console.log(`Unknown message type: ${data.type}`);
       }
     };
+
+    this.ws.onclose = (event: any) => {
+      this.connectionStatus = false;
+      this.connection = false;
+      if (this.roomId) {
+        this.connectWebsocket();
+      }
+    };
+  }
+
+  toggleVideoOrAudioRemote(data: any) {
+    console.log(this.listUUIDS);
+    console.log('toggleVideoOrAudioRemote: ', data);
+    const containerRemote = document.getElementById('remote-container');
+    if (containerRemote) {
+      console.log(containerRemote);
+      if (data.cameraOn == false) {
+        containerRemote.style.display = 'none';
+      } else {
+        containerRemote.style.display = 'block';
+      }
+    }
+    //     display: none;  div remote-container if data.cameraOn == false
+    // and add new div
   }
   sendStartCall(roomId: any) {
     this.ws.send(JSON.stringify({ type: 'start_call', roomId }));
@@ -158,8 +222,10 @@ export class HomeComponent {
       videoElement.muted = true;
       videoElement.srcObject = this.localStream;
       videoElement.playsInline = true;
-      containerDiv.className = "relative w-full pt-[100%] overflow-hidden";
-      videoElement.className = 'absolute top-0 left-0 w-full h-full object-cover rounded-full';
+      containerDiv.className =
+        'relative w-full pt-[100%] overflow-hidden local-container';
+      videoElement.className =
+        'absolute top-0 left-0 w-full h-full object-cover rounded-full';
 
       // Añadir el video al div
       containerDiv.appendChild(videoElement);
@@ -174,63 +240,55 @@ export class HomeComponent {
     }
   }
 
-  setRemoteStream(event: any, data:any) {
-    console.log("setRemoteStream - data", data);
-  
-    console.log('setRemoteStream', event.track.kind);
-    console.log('listUUIDS: ', this.listUUIDS);
-  
+  setRemoteStream(event: any, data: any) {
     // Verifica si el UUID existe en this.listUUIDS, si no, inicialízalo
     if (!this.listUUIDS[data.from]) {
       this.listUUIDS[data.from] = { video: null, audio: null };
     }
-  
+
     if (event.track.kind === 'video') {
       this.listUUIDS[data.from].video = event;
     }
     if (event.track.kind === 'audio') {
       this.listUUIDS[data.from].audio = event;
     }
-  
-    console.log('video: ', this.listUUIDS[data.from].video);
-    console.log('audio: ', this.listUUIDS[data.from].audio);
 
-    if(!this.listUUIDS[data.from].video || !this.listUUIDS[data.from].video){
+    if (!this.listUUIDS[data.from].video || !this.listUUIDS[data.from].video) {
       // Verificar el tipo de track y manejarlo adecuadamente
       this.remoteStream = event.streams[0];
       if (!this.audioContext) {
         this.audioContext = new AudioContext();
       }
-  
+
       // Crear el elemento div contenedor
       const containerDiv = document.createElement('div');
-      
+
       // Crear el elemento video
       const videoElement = document.createElement('video');
       videoElement.autoplay = true;
       videoElement.playsInline = true;
       videoElement.srcObject = this.remoteStream;
-      containerDiv.className = "relative w-full pt-[100%] overflow-hidden";
-      videoElement.className = 'absolute top-0 left-0 w-full h-full object-cover rounded-full';
-  
+      containerDiv.className =
+        'relative w-full pt-[100%] overflow-hidden remote-container';
+      videoElement.className =
+        'absolute top-0 left-0 w-full h-full object-cover rounded-full';
+
       // Añadir el video al div
       containerDiv.appendChild(videoElement);
       // Añadir el contenedor principal al DOM
       this.videoContainer.nativeElement.appendChild(containerDiv);
-  
+
       // Forzar la actualización de cambios
       this.cdr.detectChanges();
     }
   }
 
   createPeerConnection(data: any) {
-    console.log('createPeerConnection data: ', data);
-    console.log('listUUIDS: ', this.listUUIDS);
-
     // Crear una nueva RTCPeerConnection solo si no existe una para este UUID
     this.rtcPeerConnection = new RTCPeerConnection(this.iceServers);
     this.addLocalTracks();
-    this.rtcPeerConnection.ontrack = (event:any) => this.setRemoteStream(event, data);
+    this.rtcPeerConnection.ontrack = (event: any) =>
+      this.setRemoteStream(event, data);
 
     this.rtcPeerConnection.onicecandidate = this.sendIceCandidate.bind(this);
   }
@@ -289,29 +347,33 @@ export class HomeComponent {
   }
 
   joinRoom() {
-    if (!this.connection && this.roomId.trim() !== '') {
-      try {
-        this.ws.send(JSON.stringify({ type: 'join', roomId: this.roomId }));
-        this.toggleDevices(true);
-        this.showVideoConference();
-        this.connection = true;
-      } catch (error) {
-        console.log("joinRoom error: ", error)
-        this.connectWebsocket();
-        this.joinRoom();
+    if(this.roomId && this.roomId.length){
+      // if(this.ws.CLOSED){
+      //   this.connectWebsocket();
+      // }
+      if (!this.connection && this.roomId.length) {
+        try {
+          this.ws.send(JSON.stringify({ type: 'join', roomId: this.roomId }));
+          this.showVideoConference();
+          this.toggleDevices(true);
+          this.connection = true;
+        } catch (error) {
+          console.log('joinRoom error: ', error);
+          this.connectWebsocket();
+          this.joinRoom();
+        }
+      } else {
+        this.toggleDevices(false);
+        this.connection = false;
+        this.hiddenVideoConference();
+        const container = this.videoContainer.nativeElement;
+        const divs = container.querySelectorAll('div');
+  
+        divs.forEach((div: any) => {
+          div.remove();
+        });
+        this.ws.send(JSON.stringify({ type: 'close_call', roomId: this.roomId }));
       }
-    } else {
-      this.toggleDevices(false);
-      this.connection = false;
-      this.hiddenVideoConference();
-      const container = this.videoContainer.nativeElement;
-      const divs = container.querySelectorAll('div');
-
-      divs.forEach((div:any) => {
-        console.log(div)
-        div.remove();
-      });
-
     }
   }
 
