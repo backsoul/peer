@@ -197,7 +197,6 @@ func notifyClient(connection *Connection, eventType, roomID string) {
 func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 	roomID := getRoomID(data)
 	messageType := data["type"].(string)
-	messageText := data["text"].(string)
 
 	updateDeviceStatus(connection, messageType)
 
@@ -207,7 +206,6 @@ func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 		"uuid":     connection.clientUUID,
 		"cameraOn": connection.cameraOn,
 		"audioOn":  connection.audioOn,
-		"message":  messageText,
 	}, connection.clientUUID)
 }
 
