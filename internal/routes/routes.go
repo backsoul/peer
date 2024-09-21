@@ -50,7 +50,7 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	connection := initializeConnection(conn, clientUUID)
 
 	// Configurar el tiempo de espera del pong
-	conn.SetReadLimit(maxMessageSize)
+	// conn.SetReadLimit(maxMessageSize)
 	conn.SetReadDeadline(time.Now().Add(pongWait))
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(pongWait))
