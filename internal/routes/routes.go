@@ -6,16 +6,25 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
 // Variables globales
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return true },
+}
+
+const (
+	writeWait      = 10 * time.Second
+	pongWait       = 60 * time.Second
+	pingPeriod     = (pongWait * 9) / 10
+	maxMessageSize = 512
+)
+
 var (
-	upgrader = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true },
-	}
 	rooms = make(map[string]map[*websocket.Conn]string)
 	mu    sync.Mutex
 )
@@ -40,9 +49,35 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	clientUUID := uuid.New().String()
 	connection := initializeConnection(conn, clientUUID)
 
+	// Configurar el tiempo de espera del pong
+	conn.SetReadLimit(maxMessageSize)
+	conn.SetReadDeadline(time.Now().Add(pongWait))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
 	go handleWrites(connection)
 
 	sendUUIDToClient(connection, clientUUID)
+
+	// Iniciar el temporizador de ping
+	ticker := time.NewTicker(pingPeriod)
+	defer ticker.Stop()
+
+	// Manejar mensajes del cliente y enviar pings periódicos
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				conn.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					log.Printf("Error sending ping: %v", err)
+					return
+				}
+			}
+		}
+	}()
 
 	handleClientMessages(conn, connection)
 }
