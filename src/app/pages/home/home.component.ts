@@ -2,6 +2,7 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
+  NgZone,
   ViewChild,
 } from '@angular/core';
 
@@ -10,6 +11,9 @@ import {
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.css'],
 })
+
+
+
 export class HomeComponent {
   public micStatus: boolean = true;
   public videoStatus: boolean = true;
@@ -27,7 +31,7 @@ export class HomeComponent {
   mediaConstraints = { video: true, audio: true };
   iceServers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
   ws!: WebSocket;
-  roomId: string = '1';
+  roomId: string = '100';
   audioContext: AudioContext | null = null;
   analyser: AnalyserNode | null = null;
   dataArray: Uint8Array | null = null;
@@ -35,12 +39,67 @@ export class HomeComponent {
   connectionStatus: boolean = false;
   clients: any = [];
 
-  constructor(private cdr: ChangeDetectorRef) { }
+  recognition: any = null;
+  isListening: boolean = false;
+  transcript: string = '';
+  transcriptTexts: any = [];
+  openModelTranscript: boolean = false;
+  
+  @ViewChild('transcriptsContainer') private transcriptsContainer!: ElementRef;
+
+  constructor(private cdr: ChangeDetectorRef,private ngZone: NgZone) {}
 
   ngAfterViewInit() { }
 
   ngOnInit() {
     this.connectWebsocket();
+    // setInterval(()=>{
+    //   this.transcriptTexts.push({name:"bob", text:"Holaaa"})
+    // },1000)
+  }
+
+  ngAfterViewChecked() {
+  }
+
+
+  scrollToBottom(): void {
+    try {
+      this.transcriptsContainer.nativeElement.scrollTop = this.transcriptsContainer.nativeElement.scrollHeight;
+    } catch (err) {
+      console.log(err)
+    }
+  }
+
+  initializeSpeechRecognition() {
+    this.recognition = null;
+    this.recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    this.recognition.lang = 'es-MX';
+  
+    this.recognition.onstart = () => {
+      this.isListening = true;
+    };
+  
+    this.recognition.onresult = (event: any) => {
+      this.ngZone.run(() => {
+        for (let i = 0; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          this.transcriptTexts.push({ name: "bob", text: transcript });
+          console.log(transcript);
+          console.log(this.transcriptTexts);
+        }
+      });
+      // Trigger change detection after updating transcriptTexts
+      // this.cdr.detectChanges();
+    };
+  
+    this.recognition.onend = () => {
+      this.isListening = false;
+      // Reinicia el reconocimiento
+      this.recognition.start();
+    };
+  
+    // Inicia el reconocimiento al final de la configuración
+    this.recognition.start();
   }
 
   /**
@@ -126,7 +185,6 @@ export class HomeComponent {
 
     this.ws.onclose = () => {
       this.connectionStatus = false;
-      this.leaveRoom();
     };
   }
 
@@ -164,9 +222,6 @@ export class HomeComponent {
       case 'webrtc_answer':
         console.log('webrtc_answer rtcPeerConnection state:', this.rtcPeerConnection.connectionState);
         console.log('webrtc_answer rtcPeerConnection data:', data);
-        // if(this.rtcPeerConnection.connectionState == 'connecting'){
-        //   await this.retryPeerConnection(data);
-        // }
         await this.rtcPeerConnection.setRemoteDescription(
           new RTCSessionDescription(data.sdp)
         );
@@ -185,6 +240,7 @@ export class HomeComponent {
         this.toggleVideoOrAudioRemote(data);
         break;
       case 'close_call':
+        console.log('close call', data);
         this.removeClient(data.uuid);
         break;
       default:
@@ -426,6 +482,7 @@ export class HomeComponent {
       this.showVideoConference();
       this.toggleDevices(true);
       this.connection = true;
+      this.initializeSpeechRecognition();
     } catch (error) {
       console.error('Error al unirse a la sala: ', error);
       this.reconnectAndRetry();

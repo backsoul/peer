@@ -9,7 +9,10 @@
     z-index: 99;
   "
 >
-  <div style="display: flex; flex-direction: column; gap: 0px" class="text-white">
+  <div
+    style="display: flex; flex-direction: column; gap: 0px"
+    class="text-white"
+  >
     <h1
       style="
         text-align: center;
@@ -45,16 +48,15 @@
     "
   >
     <div style="height: 100%; width: 100%" class="flex flex-col">
-
       <div class="lg:col-span-6 col-span-8 w-full p-8">
-        <div class="grid gap-4 md:grid-cols-2 grid-cols-2 w-full" #videoContainer>
-        </div>
+        <div
+          class="grid gap-4 md:grid-cols-2 grid-cols-2 w-full"
+          #videoContainer
+        ></div>
       </div>
-      
-      
 
       <div
-        style="height: 100%; width: 100%; padding: 1rem;     position: absolute;"
+        style="height: 100%; width: 100%; padding: 1rem; position: absolute"
         class="lg:col-span-2 col-span-8 flex flex-col justify-end items-end lg:flex lg:justify-end lg:items-start"
       >
         <div
@@ -75,7 +77,7 @@
             "
             *ngIf="roomId && roomId.length"
           >
-            Sala #{{roomId}}
+            Sala #{{ roomId }}
           </h1>
           <div class="grid grid-cols-4 gap-2">
             <input
@@ -94,7 +96,6 @@
               class="col-span-4"
             />
             <div
-             
               class="col-span-4 cursor-pointer grid grid-cols-4"
               [ngClass]="{
                 'btn-connection': !connection,
@@ -108,7 +109,7 @@
                 width: 100%;
                 border-radius: 1rem;
               "
-               (click)="joinRoom()"
+              (click)="joinRoom()"
             >
               <h2
                 *ngIf="connection"
@@ -160,7 +161,7 @@
           </div>
         </div>
 
-        <div 
+        <div
           *ngIf="connection"
           style="
             background-color: #171720;
@@ -175,23 +176,46 @@
             bottom: 1rem;
           "
         >
-        <div class="button-class" (click)="toggleVideo(!videoStatus)">
-          <div style="cursor: pointer">
+          <div class="button-class" (click)="toggleVideo(!videoStatus)">
+            <div style="cursor: pointer">
+              <svg
+                *ngIf="videoStatus"
+                class="w-6 h-6 text-gray-800 text-white"
+                aria-hidden="true"
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M14 7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7Zm2 9.387 4.684 1.562A1 1 0 0 0 22 17V7a1 1 0 0 0-1.316-.949L16 7.613v8.774Z"
+                  clip-rule="evenodd"
+                />
+              </svg>
 
-            <svg *ngIf="videoStatus"
-            class="w-6 h-6 text-gray-800 text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-              <path fill-rule="evenodd" d="M14 7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7Zm2 9.387 4.684 1.562A1 1 0 0 0 22 17V7a1 1 0 0 0-1.316-.949L16 7.613v8.774Z" clip-rule="evenodd"/>
-            </svg>
-            
-            <svg   *ngIf="!videoStatus"
-            class="w-6 h-6 text-gray-800 text-white" class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-              <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 6H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1Zm7 11-6-2V9l6-2v10Z"/>
-            </svg>
-            
-
-
+              <svg
+                *ngIf="!videoStatus"
+                class="w-6 h-6 text-gray-800 text-white"
+                class="w-6 h-6 text-gray-800 dark:text-white"
+                aria-hidden="true"
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M14 6H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1Zm7 11-6-2V9l6-2v10Z"
+                />
+              </svg>
+            </div>
           </div>
-        </div>
           <div class="button-class" (click)="toggleMic(!micStatus)">
             <div style="cursor: pointer">
               <svg
@@ -230,7 +254,10 @@
             </div>
           </div>
 
-          <div class="button-class" (click)="toggleSpeakerStatus(!speakerStatus)">
+          <div
+            class="button-class"
+            (click)="toggleSpeakerStatus(!speakerStatus)"
+          >
             <svg
               *ngIf="speakerStatus"
               class="w-6 h-6 text-gray-800 text-white"
@@ -271,18 +298,136 @@
             </svg>
           </div>
         </div>
+
         <div class="flex justify-center items-center w-full gap-2">
-          <p style="color: #9f9f9f;">powered by backsoul</p>
-          <svg *ngIf="!connectionStatus" class="w-4 h-4 text-red-800 font-bold" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="m6 6 12 12m3-6a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+          <p style="color: #9f9f9f">powered by backsoul</p>
+          <svg
+            *ngIf="!connectionStatus"
+            class="w-4 h-4 text-red-800 font-bold"
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-width="2"
+              d="m6 6 12 12m3-6a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+            />
           </svg>
-          <svg *ngIf="connectionStatus" class="w-6 h-6 text-green-800" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
-            <path fill-rule="evenodd" d="M12 2c-.791 0-1.55.314-2.11.874l-.893.893a.985.985 0 0 1-.696.288H7.04A2.984 2.984 0 0 0 4.055 7.04v1.262a.986.986 0 0 1-.288.696l-.893.893a2.984 2.984 0 0 0 0 4.22l.893.893a.985.985 0 0 1 .288.696v1.262a2.984 2.984 0 0 0 2.984 2.984h1.262c.261 0 .512.104.696.288l.893.893a2.984 2.984 0 0 0 4.22 0l.893-.893a.985.985 0 0 1 .696-.288h1.262a2.984 2.984 0 0 0 2.984-2.984V15.7c0-.261.104-.512.288-.696l.893-.893a2.984 2.984 0 0 0 0-4.22l-.893-.893a.985.985 0 0 1-.288-.696V7.04a2.984 2.984 0 0 0-2.984-2.984h-1.262a.985.985 0 0 1-.696-.288l-.893-.893A2.984 2.984 0 0 0 12 2Zm3.683 7.73a1 1 0 1 0-1.414-1.413l-4.253 4.253-1.277-1.277a1 1 0 0 0-1.415 1.414l1.985 1.984a1 1 0 0 0 1.414 0l4.96-4.96Z" clip-rule="evenodd"/>
+          <svg
+            *ngIf="connectionStatus"
+            class="w-6 h-6 text-green-800"
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M12 2c-.791 0-1.55.314-2.11.874l-.893.893a.985.985 0 0 1-.696.288H7.04A2.984 2.984 0 0 0 4.055 7.04v1.262a.986.986 0 0 1-.288.696l-.893.893a2.984 2.984 0 0 0 0 4.22l.893.893a.985.985 0 0 1 .288.696v1.262a2.984 2.984 0 0 0 2.984 2.984h1.262c.261 0 .512.104.696.288l.893.893a2.984 2.984 0 0 0 4.22 0l.893-.893a.985.985 0 0 1 .696-.288h1.262a2.984 2.984 0 0 0 2.984-2.984V15.7c0-.261.104-.512.288-.696l.893-.893a2.984 2.984 0 0 0 0-4.22l-.893-.893a.985.985 0 0 1-.288-.696V7.04a2.984 2.984 0 0 0-2.984-2.984h-1.262a.985.985 0 0 1-.696-.288l-.893-.893A2.984 2.984 0 0 0 12 2Zm3.683 7.73a1 1 0 1 0-1.414-1.413l-4.253 4.253-1.277-1.277a1 1 0 0 0-1.415 1.414l1.985 1.984a1 1 0 0 0 1.414 0l4.96-4.96Z"
+              clip-rule="evenodd"
+            />
           </svg>
-          
         </div>
-        
       </div>
     </div>
+  </div>
+
+  <div
+    style="
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      background: #ffffffa8;
+      z-index: 99;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    "
+    [ngStyle]="{ display: openModelTranscript ? 'flex' : 'none' }"
+  >
+    <div
+      style="
+        background: white;
+        padding: 1rem 1rem;
+        width: 100%;
+        max-width: 70vw;
+        height: 58%;
+        border-radius: 2rem;
+        box-shadow: 1px 0px 20px 0px #8f8f8f;
+        border: 14px solid #efefef;
+        position: relative;
+      "
+    >
+      <div class="btn-close-modal" (click)="openModelTranscript = false">
+        <svg
+          class="w-6 h-6"
+          aria-hidden="true"
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M6 18 17.94 6M18 18 6.06 6"
+          />
+        </svg>
+      </div>
+      <div
+        style="
+          overflow-y: auto;
+          overflow-x: hidden;
+          height: 100%;
+        "
+        #transcriptsContainer
+        class="transcripts"
+      >
+      <div *ngFor="let transcript of transcriptTexts; let i = index">
+        <h6
+          style="
+            font-weight: 700;
+            font-size: 1rem;
+            font-family: system-ui;
+            color: #393939;
+          "
+        >
+          {{ transcript.name }}
+        </h6>
+        <p>
+          {{ transcript.text }}
+        </p>
+      </div>
+      
+      
+      
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-text" (click)="openModelTranscript = true" *ngIf="connection">
+    <svg
+      class="w-6 h-6 text-gray-800 dark:text-white"
+      aria-hidden="true"
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M3 6.2V5h11v1.2M8 5v14m-3 0h6m2-6.8V11h8v1.2M17 11v8m-1.5 0h3"
+      />
+    </svg>
   </div>
 </div>

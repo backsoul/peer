@@ -1,6 +1,6 @@
 /* You can add global styles to this file, and also import other style files */
 /* You can add global styles to this file, and also import other style files */
-
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,5 +9,6 @@ body,html{
     box-sizing: border-box;
     margin: 0px;
     overflow: hidden;
-    font-family: system-ui;
+    font-family: "Open Sans", sans-serif;
+    font-optical-sizing: auto;
 }
