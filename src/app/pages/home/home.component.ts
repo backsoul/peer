@@ -2,6 +2,7 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
+  NgZone,
   ViewChild,
 } from '@angular/core';
 
@@ -44,8 +45,61 @@ export class HomeComponent {
   analyser: AnalyserNode | null = null;
   dataArray: Uint8Array | null = null;
   remoteVideos: { id: string; videoContainer: HTMLDivElement }[] = [];
-  constructor(private cdr: ChangeDetectorRef) {}
+
+
+  recognition: any = null;
+  isListening: boolean = false;
+  transcript: string = '';
+  transcriptTexts: any = [];
+  openModelTranscript: boolean = false;
+
+  @ViewChild('transcriptsContainer') private transcriptsContainer!: ElementRef;
+  constructor(private cdr: ChangeDetectorRef,private ngZone: NgZone) {}
   ngAfterViewInit() {}
+
+  scrollToBottom(): void {
+    try {
+      this.transcriptsContainer.nativeElement.scrollTop = this.transcriptsContainer.nativeElement.scrollHeight;
+    } catch (err) {
+      console.log(err)
+    }
+  }
+
+  initializeSpeechRecognition() {
+    this.recognition = null;
+    this.recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    this.recognition.lang = 'es-MX';
+  
+    this.recognition.onstart = () => {
+      this.isListening = true;
+    };
+  
+    this.recognition.onresult = (event: any) => {
+      this.ngZone.run(() => {
+        for (let i = 0; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type:"transcript_text", roomId: this.roomId, text: transcript }));
+          }
+          this.transcriptTexts.push({ name: "Tu", text: transcript });
+          console.log(transcript);
+          console.log(this.transcriptTexts);
+          this.scrollToBottom();
+        }
+      });
+      // Trigger change detection after updating transcriptTexts
+      // this.cdr.detectChanges();
+    };
+  
+    this.recognition.onend = () => {
+      this.isListening = false;
+      // Reinicia el reconocimiento
+      this.recognition.start();
+    };
+  
+    // Inicia el reconocimiento al final de la configuración
+    this.recognition.start();
+  }
 
   joinRoom() {
     if (!this.connection && this.roomId.trim() !== '') {
@@ -54,6 +108,7 @@ export class HomeComponent {
         this.toggleDevices(true);
         this.showVideoConference();
         this.connection = true;
+        this.initializeSpeechRecognition();
       } catch (error) {
         this.connectWebsocket();
         this.joinRoom();
@@ -133,9 +188,9 @@ export class HomeComponent {
           await this.setLocalStream(this.mediaConstraints);
           this.sendStartCall(this.roomId);
           break;
-        // case 'full_room':
-        //   alert('The room is full, please try another one');
-        //   break;
+        case 'transcript_text':
+          this.transcriptTexts.push({ name: "Invitado", text: data.message })
+          break
         case 'start_call':
           this.createPeerConnection(data);
           await this.createOffer();
