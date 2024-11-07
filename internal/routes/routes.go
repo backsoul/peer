@@ -21,7 +21,7 @@ const (
 	writeWait      = 10 * time.Second
 	pongWait       = 60 * time.Second
 	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 512
+	maxMessageSize = 1024
 )
 
 var (
@@ -85,7 +85,7 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 func initializeConnection(conn *websocket.Conn, clientUUID string) *Connection {
 	return &Connection{
 		conn:       conn,
-		send:       make(chan []byte, 256),
+		send:       make(chan []byte, 512),
 		clientUUID: clientUUID,
 	}
 }
