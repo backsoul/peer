@@ -68,8 +68,6 @@ export class HomeComponent {
         div.remove();
       });
       this.ws.send(JSON.stringify({ type: 'close_call', roomId: this.roomId }));
-      //TODO: fix close call and not work again
-      // location.reload();
     }
   }
   
@@ -85,6 +83,7 @@ export class HomeComponent {
   toggleVideo(status: boolean) {
     this.videoStatus = status;
     if (this.localStream) {
+      console.log('localStream: ', this.localStream.getVideoTracks());
       this.localStream.getVideoTracks().forEach((track: any) => {
         track.enabled = this.videoStatus;
       });
@@ -169,7 +168,13 @@ export class HomeComponent {
     };
 
     this.ws.onclose = () => {
-      window.location.reload();
+      console.log('WebSocket connection closed, attempting to reconnect...');
+      setTimeout(() =>  this.ws = new WebSocket(this.urlWS), 5000); // Reintentando conexión después de 5 segundos
+    };
+  
+    this.ws.onerror = (error:any) => {
+      console.error('WebSocket error observed:', error);
+      this.ws.close(); // Cierra la conexión para activar el evento onclose y reintentar
     };
   }
   sendStartCall(roomId: any) {
@@ -260,10 +265,6 @@ export class HomeComponent {
           videoExist = true;
         }
       });
-
-      console.log('videoExist: ', videoExist);
-      console.log('remoteVideos: ', this.remoteVideos);
-      console.log('containerDiv: ', containerDiv);
       if (!videoExist) {
         this.videoContainer.nativeElement.appendChild(containerDiv);
         this.remoteVideos.push({ id: data.from, videoContainer: containerDiv });
