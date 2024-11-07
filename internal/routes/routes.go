@@ -145,9 +145,7 @@ func readClientMessage(conn *websocket.Conn) (string, map[string]interface{}, er
 func handleClientError(connection *Connection, roomID string, err error) {
 	if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
 		log.Printf("Client disconnected: %s", connection.clientUUID)
-		if roomID != "" {
-			handleClientDisconnect(roomID, connection)
-		}
+		handleClientDisconnect(roomID, connection)
 	} else {
 		log.Printf("Error reading message: %v", err)
 	}
