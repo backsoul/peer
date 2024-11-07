@@ -185,12 +185,14 @@ export class HomeComponent {
       const containerDiv = document.createElement('div');
       // Crear el elemento video
       const videoElement = document.createElement('video');
+      // Estilos para el contenedor y el video
+      containerDiv.className = "relative flex justify-center items-center w-auto h-auto overflow-hidden rounded-xl";
+      videoElement.className = "w-full h-full object-cover relative z-1"; 
+      // Configuración del video
       videoElement.autoplay = true;
       videoElement.muted = true;
       videoElement.srcObject = this.localStream;
       videoElement.playsInline = true;
-      containerDiv.className = "relative w-full pt-[100%] overflow-hidden";
-      videoElement.className = 'absolute top-0 left-0 w-full h-full object-cover rounded-full';
 
       // Añadir el video al div
       containerDiv.appendChild(videoElement);
@@ -228,16 +230,27 @@ export class HomeComponent {
         this.audioContext = new AudioContext();
       }
 
+      // Crear el contenedor y el elemento de video
       const containerDiv = document.createElement('div');
       const videoElement = document.createElement('video');
+
+      // Configurar el video
       videoElement.autoplay = true;
       videoElement.playsInline = true;
+      videoElement.muted = false;
       videoElement.srcObject = this.remoteStream;
       videoElement.id = data.from;
+
+      // Estilos con Tailwind CSS para el contenedor
       containerDiv.id = data.from;
-      containerDiv.className = 'relative w-full pt-[100%] overflow-hidden';
-      videoElement.className = 'absolute top-0 left-0 w-full h-full object-cover rounded-full';
+      containerDiv.className = "relative flex justify-center items-center w-auto h-auto overflow-hidden rounded-xl";
+
+      // Estilos con Tailwind CSS para el video
+      videoElement.className = "w-full h-full object-cover";
+
+      // Añadir el video al contenedor
       containerDiv.appendChild(videoElement);
+
 
 
       let videoExist = false;
