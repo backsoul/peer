@@ -39,12 +39,40 @@ export class HomeComponent {
     ],
   };
   ws: any;
-  roomId: any;
+  roomId: any = "123";
   audioContext: AudioContext | null = null;
   analyser: AnalyserNode | null = null;
   dataArray: Uint8Array | null = null;
+  remoteVideos: { id: string; videoContainer: HTMLDivElement }[] = [];
   constructor(private cdr: ChangeDetectorRef) {}
   ngAfterViewInit() {}
+
+  joinRoom() {
+    if (!this.connection && this.roomId.trim() !== '') {
+      try {
+        this.ws.send(JSON.stringify({ type: 'join', roomId: this.roomId }));
+        this.toggleDevices(true);
+        this.showVideoConference();
+        this.connection = true;
+      } catch (error) {
+        this.connectWebsocket();
+        this.joinRoom();
+      }
+    } else {
+      this.toggleDevices(false);
+      this.connection = false;
+      this.hiddenVideoConference();
+      const container = this.videoContainer.nativeElement;
+      const divs = container.querySelectorAll('div');
+      divs.forEach((div:any) => {
+        div.remove();
+      });
+      this.ws.send(JSON.stringify({ type: 'close_call', roomId: this.roomId }));
+      //TODO: fix close call and not work again
+      // location.reload();
+    }
+  }
+  
   toggleMic(status: boolean) {
     this.micStatus = status;
     if (this.localStream) {
@@ -56,7 +84,6 @@ export class HomeComponent {
 
   toggleVideo(status: boolean) {
     this.videoStatus = status;
-    console.log('Micrófono:', this.videoStatus ? 'Activado' : 'Desactivado');
     if (this.localStream) {
       this.localStream.getVideoTracks().forEach((track: any) => {
         track.enabled = this.videoStatus;
@@ -74,7 +101,6 @@ export class HomeComponent {
   }
   ngOnInit() {
    this.connectWebsocket();
- 
   }
 
   toggleDevices(status: boolean){
@@ -112,12 +138,10 @@ export class HomeComponent {
         //   alert('The room is full, please try another one');
         //   break;
         case 'start_call':
-          console.log('start_call', data);
           this.createPeerConnection(data);
           await this.createOffer();
           break;
         case 'webrtc_offer':
-          console.log('webrtc_offer', data);
           this.createPeerConnection(data);
           this.rtcPeerConnection.setRemoteDescription(
             new RTCSessionDescription(data.sdp)
@@ -136,9 +160,16 @@ export class HomeComponent {
           });
           this.rtcPeerConnection.addIceCandidate(candidate);
           break;
+        case 'close_call':
+          this.removeVideoById(data.uuid);
+          break;
         default:
           console.log(`Unknown message type: ${data.type}`);
       }
+    };
+
+    this.ws.onclose = () => {
+      window.location.reload();
     };
   }
   sendStartCall(roomId: any) {
@@ -174,58 +205,72 @@ export class HomeComponent {
     }
   }
 
-  setRemoteStream(event: any, data:any) {
-    console.log("setRemoteStream - data", data);
-  
-    console.log('setRemoteStream', event.track.kind);
-    console.log('listUUIDS: ', this.listUUIDS);
-  
-    // Verifica si el UUID existe en this.listUUIDS, si no, inicialízalo
-    if (!this.listUUIDS[data.from]) {
-      this.listUUIDS[data.from] = { video: null, audio: null };
+  setRemoteStream(event: any, data: any) {
+
+    let uuidExists = this.listUUIDS.find(u => u.uuid === data.from);
+    if (!uuidExists) {
+      this.listUUIDS.push({ uuid: data.from, video: null, audio: null });
     }
-  
+
+    let indexUUID = this.listUUIDS.findIndex(u => u.uuid === data.from);
+
     if (event.track.kind === 'video') {
-      this.listUUIDS[data.from].video = event;
+      this.listUUIDS[indexUUID].video = event;
     }
     if (event.track.kind === 'audio') {
-      this.listUUIDS[data.from].audio = event;
+      this.listUUIDS[indexUUID].audio = event;
     }
-  
-    console.log('video: ', this.listUUIDS[data.from].video);
-    console.log('audio: ', this.listUUIDS[data.from].audio);
 
-    if(!this.listUUIDS[data.from].video || !this.listUUIDS[data.from].video){
-      // Verificar el tipo de track y manejarlo adecuadamente
+
+    if ((!this.listUUIDS[indexUUID].video || !this.listUUIDS[indexUUID].audio) && data.from) {
       this.remoteStream = event.streams[0];
       if (!this.audioContext) {
         this.audioContext = new AudioContext();
       }
-  
-      // Crear el elemento div contenedor
+
       const containerDiv = document.createElement('div');
-      
-      // Crear el elemento video
       const videoElement = document.createElement('video');
       videoElement.autoplay = true;
       videoElement.playsInline = true;
       videoElement.srcObject = this.remoteStream;
-      containerDiv.className = "relative w-full pt-[100%] overflow-hidden";
+      videoElement.id = data.from;
+      containerDiv.id = data.from;
+      containerDiv.className = 'relative w-full pt-[100%] overflow-hidden';
       videoElement.className = 'absolute top-0 left-0 w-full h-full object-cover rounded-full';
-  
-      // Añadir el video al div
       containerDiv.appendChild(videoElement);
-      // Añadir el contenedor principal al DOM
-      this.videoContainer.nativeElement.appendChild(containerDiv);
-  
-      // Forzar la actualización de cambios
+
+
+      let videoExist = false;
+      this.remoteVideos.forEach(v => {
+        if (v.id === data.from) {
+          v.videoContainer.getElementsByTagName('video')[0].srcObject = this.remoteStream;
+          videoExist = true;
+        }
+      });
+
+      console.log('videoExist: ', videoExist);
+      console.log('remoteVideos: ', this.remoteVideos);
+      console.log('containerDiv: ', containerDiv);
+      if (!videoExist) {
+        this.videoContainer.nativeElement.appendChild(containerDiv);
+        this.remoteVideos.push({ id: data.from, videoContainer: containerDiv });
+      }
+    }
+    this.cdr.detectChanges();
+  }
+
+  removeVideoById(id: string) {
+    const videoIndex = this.remoteVideos.findIndex(v => v.id === id);
+    if (videoIndex >= 0) {
+      const videoToRemove = this.remoteVideos[videoIndex];
+      this.listUUIDS = this.listUUIDS.filter(u => u.uuid !== id);
+      videoToRemove.videoContainer.remove();
+      this.remoteVideos.splice(videoIndex, 1);
       this.cdr.detectChanges();
     }
   }
 
   createPeerConnection(data: any) {
-    console.log('createPeerConnection data: ', data);
-    console.log('listUUIDS: ', this.listUUIDS);
 
     // Crear una nueva RTCPeerConnection solo si no existe una para este UUID
     this.rtcPeerConnection = new RTCPeerConnection(this.iceServers);
@@ -288,32 +333,7 @@ export class HomeComponent {
     }
   }
 
-  joinRoom() {
-    if (!this.connection && this.roomId.trim() !== '') {
-      try {
-        this.ws.send(JSON.stringify({ type: 'join', roomId: this.roomId }));
-        this.toggleDevices(true);
-        this.showVideoConference();
-        this.connection = true;
-      } catch (error) {
-        console.log("joinRoom error: ", error)
-        this.connectWebsocket();
-        this.joinRoom();
-      }
-    } else {
-      this.toggleDevices(false);
-      this.connection = false;
-      this.hiddenVideoConference();
-      const container = this.videoContainer.nativeElement;
-      const divs = container.querySelectorAll('div');
-
-      divs.forEach((div:any) => {
-        console.log(div)
-        div.remove();
-      });
-
-    }
-  }
+  
 
   showVideoConference() {
     this.showRoomSelection = false;
