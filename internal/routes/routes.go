@@ -261,8 +261,6 @@ func handleClientDisconnect(roomID string, connection *Connection) {
 			"uuid":   connection.clientUUID,
 			"roomId": roomID,
 		}, connection.clientUUID)
-	} else {
-		removeRoom(roomID)
 	}
 }
 
