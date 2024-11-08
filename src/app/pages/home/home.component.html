@@ -1,6 +1,4 @@
-
-<div
-    style="
+<div style="
       width: 100vw;
       height: 100vh;
       position: absolute;
@@ -9,11 +7,8 @@
       display: flex;
       justify-content: center;
       align-items: center;
-    "
-    [ngStyle]="{ display: openModelTranscript ? 'flex' : 'none' }"
-  >
-    <div
-      style="
+    " [ngStyle]="{ display: openModelTranscript ? 'flex' : 'none' }">
+  <div style="
         background: white;
         padding: 1rem 1rem;
         width: 100%;
@@ -23,57 +18,38 @@
         box-shadow: 1px 0px 20px 0px #8f8f8f;
         border: 14px solid #efefef;
         position: relative;
-      "
-    >
-      <div class="btn-close-modal" (click)="openModelTranscript = false">
-        <svg
-          class="w-6 h-6"
-          aria-hidden="true"
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M6 18 17.94 6M18 18 6.06 6"
-          />
-        </svg>
-      </div>
-      <div
-        style="
+      ">
+    <div class="btn-close-modal" (click)="openModelTranscript = false">
+      <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
+        viewBox="0 0 24 24">
+        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M6 18 17.94 6M18 18 6.06 6" />
+      </svg>
+    </div>
+    <div style="
           overflow-y: auto;
           overflow-x: hidden;
           height: 100%;
-        "
-        #transcriptsContainer
-        class="transcripts"
-      >
+        " #transcriptsContainer class="transcripts">
       <div *ngFor="let transcript of transcriptTexts; let i = index">
-        <h6
-          style="
+        <h6 style="
             font-weight: 700;
             font-size: 1rem;
             font-family: system-ui;
             color: #393939;
-          "
-        >
+          ">
           {{ transcript.name }}
         </h6>
         <p>
           {{ transcript.text }}
         </p>
       </div>
-      
-      
-      
-      </div>
+
+
+
     </div>
   </div>
+</div>
 
 <div style="
     display: flex;
@@ -112,10 +88,10 @@
   font-size: 1.5rem;
   color: white;
 " *ngIf="connection">
-Sala #{{roomId}}
-</h1>
+    Sala #{{roomId}}
+  </h1>
 
-<!-- <label for="qualitySelect">Selecciona la calidad:</label>
+  <!-- <label for="qualitySelect">Selecciona la calidad:</label>
   <select id="qualitySelect" (change)="changeMediaQuality($event)">
     <option value="high">Alta</option>
     <option value="medium">Media</option>
@@ -177,7 +153,7 @@ Sala #{{roomId}}
   </div>
 
 
-  
+
 
   <div style="position: absolute;
   bottom: 0px;
@@ -255,20 +231,34 @@ Sala #{{roomId}}
         </svg>
       </div>
 
+      <!-- <div class="button-class" (click)="startRecording()">
+        <svg *ngIf="!recording" class="w-6 h-6 text-white  rounded-sm cursor-pointer" aria-hidden="true"
+          xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
+          <path fill-rule="evenodd"
+            d="M19.003 3A2 2 0 0 1 21 5v2h-2V5.414L17.414 7h-2.828l2-2h-2.172l-2 2H9.586l2-2H9.414l-2 2H3V5a2 2 0 0 1 2-2h14.003ZM3 9v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9H3Zm2-2.414L6.586 5H5v1.586Zm4.553 4.52a1 1 0 0 1 1.047.094l4 3a1 1 0 0 1 0 1.6l-4 3A1 1 0 0 1 9 18v-6a1 1 0 0 1 .553-.894Z"
+            clip-rule="evenodd" />
+        </svg>
+
+        <svg *ngIf="recording" class="w-6 h-6 text-red-800  rounded-sm cursor-pointer" aria-hidden="true"
+          xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M19 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1Zm0 0-4 4m5 0H4m1 0 4-4m1 4 4-4m-4 7v6l4-3-4-3Z" />
+        </svg>
+      </div> -->
+
       <div class="button-class" (click)="joinRoom()">
-        <svg *ngIf="connection" class="w-8 h-8 bg-red-800 text-white rounded-sm cursor-pointer"
-                  aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
-                  viewBox="0 0 24 24">
-                  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M6 18 17.94 6M18 18 6.06 6" />
-                </svg>
+        <svg *ngIf="connection" class="w-8 h-8 bg-red-800 text-white rounded-sm cursor-pointer" aria-hidden="true"
+          xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M6 18 17.94 6M18 18 6.06 6" />
+        </svg>
       </div>
+
+
     </div>
-  </div>
-</div>
 
 
-<!-- 
+    <!-- 
   <div class="btn-text" (click)="openModelTranscript = true" *ngIf="connection">
     <svg
       class="w-6 h-6 text-gray-800 dark:text-white"

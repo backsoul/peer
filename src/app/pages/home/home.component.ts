@@ -5,7 +5,7 @@ import {
   NgZone,
   ViewChild,
 } from '@angular/core';
-
+import RecordRTC from 'recordrtc';
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
@@ -36,6 +36,7 @@ export class HomeComponent {
     audio: {
       sampleSize: 8,
       channelCount: 2,
+      echoCancellation: true, noiseSuppression: true
     }
   };
   listUUIDS: any[] = [];
@@ -59,6 +60,11 @@ export class HomeComponent {
   transcript: string = '';
   transcriptTexts: any = [];
   openModelTranscript: boolean = false;
+
+  private recorder: RecordRTC | any = null;
+  private stream: MediaStream | any = null;
+  recording = false;
+
 
   @ViewChild('transcriptsContainer') private transcriptsContainer!: ElementRef;
   constructor(private cdr: ChangeDetectorRef,private ngZone: NgZone) {}
@@ -247,7 +253,7 @@ export class HomeComponent {
     try {
       // Obtener el stream local con las nuevas restricciones de calidad
       this.localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-  
+      
       // Crear el contenedor y el elemento de video
       const containerDiv = document.createElement('div');
       const videoElement = document.createElement('video');
@@ -261,17 +267,56 @@ export class HomeComponent {
       videoElement.muted = true;
       videoElement.srcObject = this.localStream;
       videoElement.playsInline = true;
-  
+      
       // Añadir el video al contenedor
       containerDiv.appendChild(videoElement);
       this.videoContainer.nativeElement.appendChild(containerDiv);
-  
+      
       // Forzar la actualización de cambios
       this.cdr.detectChanges();
+  
+      // Crear el contexto de audio
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      const source = audioContext.createMediaStreamSource(this.localStream);
+      source.connect(analyser);
+  
+      // Crear un array para almacenar los datos de frecuencia
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      // Umbral para el volumen
+      const volumeThreshold = 10; // Ajusta este valor al umbral que desees
+  
+      // Función para verificar el volumen y cambiar el borde
+      const checkAudioVolume = () => {
+        analyser.getByteFrequencyData(dataArray);
+  
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+  
+        const averageVolume = sum / bufferLength;
+  
+        if (averageVolume > volumeThreshold) {
+          containerDiv.style.border = '3px solid white';
+        } else {
+          containerDiv.style.border = 'none';
+        }
+  
+        // Llamar a la función repetidamente
+        requestAnimationFrame(checkAudioVolume);
+      };
+  
+      // Iniciar la verificación del volumen
+      checkAudioVolume();
+  
     } catch (error) {
       console.error('Could not get user media', error);
     }
   }
+  
   
 
   ngOnDestroy(): void {
@@ -283,51 +328,47 @@ export class HomeComponent {
   }
 
   setRemoteStream(event: any, data: any) {
-
     let uuidExists = this.listUUIDS.find(u => u.uuid === data.from);
     if (!uuidExists) {
       this.listUUIDS.push({ uuid: data.from, video: null, audio: null });
     }
-
+  
     let indexUUID = this.listUUIDS.findIndex(u => u.uuid === data.from);
-
+  
     if (event.track.kind === 'video') {
       this.listUUIDS[indexUUID].video = event;
     }
     if (event.track.kind === 'audio') {
       this.listUUIDS[indexUUID].audio = event;
     }
-
-
+  
     if ((!this.listUUIDS[indexUUID].video || !this.listUUIDS[indexUUID].audio) && data.from) {
       this.remoteStream = event.streams[0];
       if (!this.audioContext) {
         this.audioContext = new AudioContext();
       }
-
+  
       // Crear el contenedor y el elemento de video
       const containerDiv = document.createElement('div');
       const videoElement = document.createElement('video');
-
+  
       // Configurar el video
       videoElement.autoplay = true;
       videoElement.playsInline = true;
       videoElement.muted = false;
       videoElement.srcObject = this.remoteStream;
       videoElement.id = data.from;
-
+  
       // Estilos con Tailwind CSS para el contenedor
       containerDiv.id = data.from;
       containerDiv.className = "relative flex justify-center items-center w-auto h-auto overflow-hidden rounded-xl";
-
+  
       // Estilos con Tailwind CSS para el video
       videoElement.className = "w-full h-full object-cover";
-
+  
       // Añadir el video al contenedor
       containerDiv.appendChild(videoElement);
-
-
-
+  
       let videoExist = false;
       this.remoteVideos.forEach(v => {
         if (v.id === data.from) {
@@ -339,9 +380,48 @@ export class HomeComponent {
         this.videoContainer.nativeElement.appendChild(containerDiv);
         this.remoteVideos.push({ id: data.from, videoContainer: containerDiv });
       }
+  
+      // Crear el contexto de audio para el audio remoto
+      const analyser = this.audioContext.createAnalyser();
+      const source = this.audioContext.createMediaStreamSource(this.remoteStream);
+      source.connect(analyser);
+  
+      // Crear un array para almacenar los datos de frecuencia
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+  
+      // Umbral para el volumen
+      const volumeThreshold = 10; // Ajusta este valor al umbral que desees
+  
+      // Función para verificar el volumen y cambiar el borde
+      const checkAudioVolume = () => {
+        analyser.getByteFrequencyData(dataArray);
+  
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+  
+        const averageVolume = sum / bufferLength;
+  
+        // Si el volumen promedio supera el umbral, pon un borde verde
+        if (averageVolume > volumeThreshold) {
+          containerDiv.style.border = '3px solid white'; // Borde verde
+        } else {
+          containerDiv.style.border = 'none'; // Sin borde
+        }
+  
+        // Llamar a la función repetidamente
+        requestAnimationFrame(checkAudioVolume);
+      };
+  
+      // Iniciar la verificación del volumen
+      checkAudioVolume();
     }
+  
     this.cdr.detectChanges();
   }
+  
 
   removeVideoById(id: string) {
     const videoIndex = this.remoteVideos.findIndex(v => v.id === id);
@@ -426,4 +506,54 @@ export class HomeComponent {
   hiddenVideoConference() {
     this.showRoomSelection = true;
   }
+
+  startRecording() {
+    console.log('iniciando grabación');
+    if (!this.recording) {
+      navigator.mediaDevices
+        .getDisplayMedia({ video: true, audio: { echoCancellation: true, noiseSuppression: true }  })
+        .then((stream) => {
+          console.log('stream recibido');
+          this.stream = stream;
+
+          // Crear una instancia de RecordRTC para grabar en mp4
+          this.recorder = new RecordRTC(stream, {
+            type: 'video',
+            mimeType: 'video/mp4', // Formato de salida mp4
+            recorderType: RecordRTC.MediaStreamRecorder,
+          });
+
+          this.recorder.startRecording();
+          this.recording = true;
+        })
+        .catch((err) => {
+          console.error('Error al iniciar la grabación:', err);
+        });
+    } else {
+      this.stopRecording();
+    }
+  }
+
+  stopRecording() {
+    if (this.recorder && this.stream) {
+      this.recorder.stopRecording(() => {
+        const blob = this.recorder.getBlob();
+        const videoURL = URL.createObjectURL(blob);
+
+        // Crear un enlace de descarga
+        const a = document.createElement('a');
+        const date = new Date();
+        const timestamp = date.toISOString().slice(0, 19).replace('T', ' ').replace(/:/g, '-');
+        a.href = videoURL;
+        a.download = `grabacion-${timestamp}.mp4`; // Nombre dinámico con fecha y hora
+        a.click(); // Iniciar la descarga
+
+        // Detener los tracks del stream
+        this.stream.getTracks().forEach((track: any) => track.stop());
+        this.recording = false;
+      });
+    }
+  }
+  
+  
 }
