@@ -28,8 +28,15 @@ export class HomeComponent {
   showRoomSelection: boolean = true;
   videoChatContainer: boolean = false;
   mediaConstraints = {
-    video: true,
-    audio: true,
+    video: {
+      width: { ideal: 640 }, // Resolución más baja
+      height: { ideal: 360 }, // Resolución más baja
+      frameRate: { ideal: 30, max: 30 }, // Frame rate más bajo
+    },
+    audio: {
+      sampleSize: 8,
+      channelCount: 2,
+    }
   };
   listUUIDS: any[] = [];
   iceServers = {
@@ -108,7 +115,7 @@ export class HomeComponent {
         this.toggleDevices(true);
         this.showVideoConference();
         this.connection = true;
-        this.initializeSpeechRecognition();
+        // this.initializeSpeechRecognition();
       } catch (error) {
         this.connectWebsocket();
         this.joinRoom();
@@ -238,33 +245,41 @@ export class HomeComponent {
 
   async setLocalStream(mediaConstraints: any) {
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia(
-        mediaConstraints
-      );
-      // Crear el elemento div
+      // Obtener el stream local con las nuevas restricciones de calidad
+      this.localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+  
+      // Crear el contenedor y el elemento de video
       const containerDiv = document.createElement('div');
-      // Crear el elemento video
       const videoElement = document.createElement('video');
-      // Estilos para el contenedor y el video
+      
+      // Estilo del contenedor y video
       containerDiv.className = "relative flex justify-center items-center w-auto h-auto overflow-hidden rounded-xl";
-      videoElement.className = "w-full h-full object-cover relative z-1"; 
+      videoElement.className = "w-full h-full object-cover relative z-1";
+      
       // Configuración del video
       videoElement.autoplay = true;
       videoElement.muted = true;
       videoElement.srcObject = this.localStream;
       videoElement.playsInline = true;
-
-      // Añadir el video al div
+  
+      // Añadir el video al contenedor
       containerDiv.appendChild(videoElement);
-
-      // Añadir el div al contenedor
       this.videoContainer.nativeElement.appendChild(containerDiv);
-
+  
       // Forzar la actualización de cambios
       this.cdr.detectChanges();
     } catch (error) {
       console.error('Could not get user media', error);
     }
+  }
+  
+
+  ngOnDestroy(): void {
+    this.ws.send(JSON.stringify({ type: 'close_call', roomId: this.roomId }));
+  }
+
+  changeMediaQuality(event: any) {
+    console.log(event.target.value);
   }
 
   setRemoteStream(event: any, data: any) {

@@ -115,6 +115,13 @@
 Sala #{{roomId}}
 </h1>
 
+<!-- <label for="qualitySelect">Selecciona la calidad:</label>
+  <select id="qualitySelect" (change)="changeMediaQuality($event)">
+    <option value="high">Alta</option>
+    <option value="medium">Media</option>
+    <option value="low">Baja</option>
+  </select> -->
+
   <div class="flex flex-col" *ngIf="!connection">
     <div style="height: 100%; width: 100%; padding: 1rem;     position: relative;"
       class="lg:col-span-2 col-span-8 flex flex-col justify-end items-end lg:flex lg:justify-end lg:items-start">
@@ -125,7 +132,7 @@ Sala #{{roomId}}
           width: 100%;
         " [ngClass]="{ 'bg-connection': connection, 'bg-close': !connection }">
         <div class="grid grid-cols-4 gap-2">
-          <input type="text" [(ngModel)]="roomId" name="url" id="" placeholder="room url" style="
+          <input type="text" [(ngModel)]="roomId" name="roomid" id="" placeholder="Ingresa numero de la sala" style="
               border-radius: 1rem;
               color: black;
               border: 0px;
@@ -261,7 +268,7 @@ Sala #{{roomId}}
 </div>
 
 
-
+<!-- 
   <div class="btn-text" (click)="openModelTranscript = true" *ngIf="connection">
     <svg
       class="w-6 h-6 text-gray-800 dark:text-white"
@@ -280,4 +287,4 @@ Sala #{{roomId}}
         d="M3 6.2V5h11v1.2M8 5v14m-3 0h6m2-6.8V11h8v1.2M17 11v8m-1.5 0h3"
       />
     </svg>
-  </div>
+  </div> -->
