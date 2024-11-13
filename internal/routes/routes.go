@@ -21,7 +21,7 @@ const (
 	writeWait      = 10 * time.Second
 	pongWait       = 60 * time.Second
 	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 512
+	maxMessageSize = 1024
 )
 
 var (
@@ -148,7 +148,6 @@ func handleClientError(connection *Connection, roomID string, err error) {
 		handleClientDisconnect(roomID, connection)
 	} else {
 		log.Printf("Error reading message: %v", err)
-		handleClientDisconnect(roomID, connection)
 	}
 }
 
@@ -156,6 +155,14 @@ func handleJoin(connection *Connection, data map[string]interface{}) string {
 	roomID := getRoomID(data)
 
 	room := getRoom(roomID)
+	if len(room) >= 2 {
+		connection.send <- encodeJSON(map[string]interface{}{
+			"type":   "full_room",
+			"roomId": roomID,
+		})
+		connection.conn.Close()
+		return ""
+	}
 
 	room = addToRoom(connection, roomID)
 
