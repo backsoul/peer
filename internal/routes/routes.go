@@ -12,11 +12,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Variables globales
+// Configuración para la conexión WebSocket
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
+// Constantes de configuración
 const (
 	writeWait      = 10 * time.Second
 	pongWait       = 60 * time.Second
@@ -24,11 +25,13 @@ const (
 	maxMessageSize = 4096
 )
 
+// Variables globales
 var (
 	rooms = make(map[string]map[*websocket.Conn]string)
 	mu    sync.Mutex
 )
 
+// Connection representa una conexión WebSocket
 type Connection struct {
 	conn           *websocket.Conn
 	send           chan []byte
@@ -50,13 +53,13 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	clientUUID := uuid.New().String()
 
 	// Leer el mensaje inicial para configuración
-	_, data, err := readClientMessage(conn)
+	data, err := readClientMessage(conn)
 	if err != nil {
 		log.Printf("Error reading initial config: %v", err)
 		return
 	}
 
-	// Si se envía `maxMessageSize` en el mensaje inicial, úsalo; si no, usa un valor predeterminado
+	// Establecer tamaño máximo de mensaje, si es proporcionado por el cliente
 	var maxMessageSize int64 = 4096
 	if size, ok := data["maxMessageSize"].(float64); ok {
 		maxMessageSize = int64(size)
@@ -109,49 +112,53 @@ func sendUUIDToClient(connection *Connection, clientUUID string) {
 	})
 }
 
+func handleWrites(connection *Connection) {
+	defer close(connection.send)
+	for msg := range connection.send {
+		connection.conn.SetWriteDeadline(time.Now().Add(writeWait))
+		if err := connection.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+			log.Printf("Error writing message: %v", err)
+			break
+		}
+	}
+}
+
 func handleClientMessages(conn *websocket.Conn, connection *Connection) {
 	var roomID string
 	for {
-		messageType, data, err := readClientMessage(conn)
+		data, err := readClientMessage(conn) // messageType no es necesario aquí
 		if err != nil {
 			handleClientError(connection, roomID, err)
 			break
 		}
 
-		switch messageType {
+		switch data["type"] {
 		case "join":
 			roomID = handleJoin(connection, data)
 		case "close_call":
 			handleClientDisconnect(roomID, connection)
-		case "start_call", "webrtc_offer", "webrtc_answer", "webrtc_ice_candidate":
-			handleRoomMessage(data, connection)
-		case "transcript_text":
-			handleTranscript(data, connection)
-		case "mic_on_remote", "mic_off_remote", "video_on_remote", "video_off_remote":
+		case "video_on_remote", "video_off_remote", "mic_on_remote", "mic_off_remote":
 			handleDevicesStatus(connection, data)
+		case "transcript":
+			handleTranscript(data, connection)
 		default:
-			log.Printf("Unknown message type: %s", messageType)
+			handleRoomMessage(data, connection)
 		}
 	}
 }
 
-func readClientMessage(conn *websocket.Conn) (string, map[string]interface{}, error) {
+func readClientMessage(conn *websocket.Conn) (map[string]interface{}, error) {
 	_, message, err := conn.ReadMessage()
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
 	var data map[string]interface{}
 	if err := json.Unmarshal(message, &data); err != nil {
-		return "", nil, fmt.Errorf("error unmarshaling message: %v", err)
+		return nil, fmt.Errorf("error unmarshaling message: %v", err)
 	}
 
-	messageType, ok := data["type"].(string)
-	if !ok {
-		return "", nil, fmt.Errorf("invalid message format")
-	}
-
-	return messageType, data, nil
+	return data, nil // Eliminamos `messageType` ya que se puede acceder a él desde `data`
 }
 
 func handleClientError(connection *Connection, roomID string, err error) {
@@ -207,13 +214,12 @@ func notifyClient(connection *Connection, eventType, roomID string) {
 
 func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 	roomID := getRoomID(data)
-	messageType := data["type"].(string)
 
-	updateDeviceStatus(connection, messageType)
+	// `data["type"]` determina el estado del dispositivo
+	updateDeviceStatus(connection, data["type"].(string))
 
-	// room := getRoom(roomID)
 	broadcastToRoom(roomID, map[string]interface{}{
-		"type":     messageType,
+		"type":     data["type"],
 		"uuid":     connection.clientUUID,
 		"cameraOn": connection.cameraOn,
 		"audioOn":  connection.audioOn,
@@ -225,22 +231,19 @@ func handleTranscript(data map[string]interface{}, connection *Connection) {
 	messageType := data["type"].(string)
 	messageText, ok := data["text"].(string)
 	if !ok {
-		messageText = "" // Asignar un valor por defecto si no está presente
+		messageText = ""
 	}
 
-	// Actualizar el estado del dispositivo, aunque esto parece innecesario para transcripción
 	updateDeviceStatus(connection, messageType)
 
-	// Crear el mensaje que será retransmitido
 	message := map[string]interface{}{
 		"type":     messageType,
 		"uuid":     connection.clientUUID,
 		"cameraOn": connection.cameraOn,
 		"audioOn":  connection.audioOn,
-		"message":  messageText, // Aquí se incluye el texto de la transcripción
+		"message":  messageText,
 	}
 
-	// Retransmitir el mensaje a todos los clientes en la sala, excepto al que lo envió
 	broadcastToRoom(roomID, message, connection.clientUUID)
 }
 
@@ -306,57 +309,29 @@ func broadcastToRoom(roomID string, message map[string]interface{}, senderUUID s
 }
 
 func sendMessageToClient(conn *websocket.Conn, message map[string]interface{}, clientUUID string) {
-	if err := conn.WriteMessage(websocket.TextMessage, encodeJSON(message)); err != nil {
-		log.Printf("Error broadcasting to client %s: %v", clientUUID, err)
+	conn.SetWriteDeadline(time.Now().Add(writeWait))
+
+	message["uuid"] = clientUUID
+
+	if err := conn.WriteJSON(message); err != nil {
+		log.Printf("Error sending message to client %s: %v", clientUUID, err)
 		conn.Close()
-		removeConnectionFromRoom(conn)
-	} else {
-		log.Printf("Message sent to client %s", clientUUID)
-	}
-}
-
-func removeConnectionFromRoom(conn *websocket.Conn) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	for roomID, room := range rooms {
-		delete(room, conn)
-		if len(room) == 0 {
-			delete(rooms, roomID)
-		}
-	}
-}
-
-func handleWrites(connection *Connection) {
-	defer close(connection.send)
-
-	for msg := range connection.send {
-		if err := connection.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-			log.Printf("Error writing message: %v", err)
-			break
-		}
-	}
-}
-
-func handleRoomMessage(data map[string]interface{}, connection *Connection) {
-	roomID := getRoomID(data)
-	room := getRoom(roomID)
-
-	for client := range room {
-		if client != connection.conn {
-			data["from"] = connection.clientUUID
-			data["audioOn"] = connection.audioOn
-			data["cameraOn"] = connection.cameraOn
-			client.WriteMessage(websocket.TextMessage, encodeJSON(data))
-		}
 	}
 }
 
 func encodeJSON(data map[string]interface{}) []byte {
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		log.Printf("Error encoding JSON: %v", err)
-		return nil
+	result, _ := json.Marshal(data)
+	return result
+}
+
+func handleRoomMessage(data map[string]interface{}, connection *Connection) {
+	roomID := getRoomID(data)
+
+	message := map[string]interface{}{
+		"type": "room_message",
+		"uuid": connection.clientUUID,
+		"text": data["text"].(string),
 	}
-	return jsonData
+
+	broadcastToRoom(roomID, message, connection.clientUUID)
 }
