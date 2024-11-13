@@ -9,6 +9,7 @@ import (
 )
 
 // Mutex para proteger el acceso a rooms
+// add comments function
 
 func main() {
 	http.HandleFunc("/", routes.HandleConnection)

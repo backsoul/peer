@@ -50,7 +50,7 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	connection := initializeConnection(conn, clientUUID)
 
 	// Configurar el tiempo de espera del pong
-	// conn.SetReadLimit(maxMessageSize)
+	conn.SetReadLimit(maxMessageSize)
 	conn.SetReadDeadline(time.Now().Add(pongWait))
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -153,16 +153,9 @@ func handleClientError(connection *Connection, roomID string, err error) {
 
 func handleJoin(connection *Connection, data map[string]interface{}) string {
 	roomID := getRoomID(data)
-
-	room := addToRoom(connection, roomID)
-
-	if len(room) == 1 {
-		notifyClient(connection, "room_created", roomID)
-	} else {
-		notifyClient(connection, "room_joined", roomID)
-		broadcastToRoom(roomID, map[string]interface{}{"type": "start_call"}, connection.clientUUID)
-	}
-
+	_ = addToRoom(connection, roomID)
+	notifyClient(connection, "room_joined", roomID)
+	broadcastToRoom(roomID, map[string]interface{}{"type": "start_call"}, connection.clientUUID)
 	return roomID
 }
 
@@ -253,15 +246,11 @@ func getRoom(roomID string) map[*websocket.Conn]string {
 
 func handleClientDisconnect(roomID string, connection *Connection) {
 	removeFromRoom(roomID, connection)
-
-	room := getRoom(roomID)
-	if len(room) > 0 {
-		broadcastToRoom(roomID, map[string]interface{}{
-			"type":   "close_call",
-			"uuid":   connection.clientUUID,
-			"roomId": roomID,
-		}, connection.clientUUID)
-	}
+	broadcastToRoom(roomID, map[string]interface{}{
+		"type":   "close_call",
+		"uuid":   connection.clientUUID,
+		"roomId": roomID,
+	}, connection.clientUUID)
 }
 
 func removeFromRoom(roomID string, connection *Connection) {
