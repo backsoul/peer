@@ -12,33 +12,29 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Configuración para la conexión WebSocket
+// Variables globales
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-// Constantes de configuración
 const (
 	writeWait      = 10 * time.Second
 	pongWait       = 60 * time.Second
 	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 4096
+	maxMessageSize = 1024
 )
 
-// Variables globales
 var (
 	rooms = make(map[string]map[*websocket.Conn]string)
 	mu    sync.Mutex
 )
 
-// Connection representa una conexión WebSocket
 type Connection struct {
-	conn           *websocket.Conn
-	send           chan []byte
-	clientUUID     string
-	cameraOn       bool
-	audioOn        bool
-	maxMessageSize int64
+	conn       *websocket.Conn
+	send       chan []byte
+	clientUUID string
+	cameraOn   bool
+	audioOn    bool
 }
 
 // HandleConnection gestiona la nueva conexión WebSocket
@@ -51,23 +47,10 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	clientUUID := uuid.New().String()
+	connection := initializeConnection(conn, clientUUID)
 
-	// Leer el mensaje inicial para configuración
-	data, err := readClientMessage(conn)
-	if err != nil {
-		log.Printf("Error reading initial config: %v", err)
-		return
-	}
-
-	// Establecer tamaño máximo de mensaje, si es proporcionado por el cliente
-	var maxMessageSize int64 = 4096
-	if size, ok := data["maxMessageSize"].(float64); ok {
-		maxMessageSize = int64(size)
-	}
-
-	connection := initializeConnection(conn, clientUUID, maxMessageSize)
-
-	conn.SetReadLimit(connection.maxMessageSize)
+	// Configurar el tiempo de espera del pong
+	conn.SetReadLimit(maxMessageSize)
 	conn.SetReadDeadline(time.Now().Add(pongWait))
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -75,11 +58,14 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	})
 
 	go handleWrites(connection)
+
 	sendUUIDToClient(connection, clientUUID)
 
+	// Iniciar el temporizador de ping
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
 
+	// Manejar mensajes del cliente y enviar pings periódicos
 	go func() {
 		for {
 			select {
@@ -96,12 +82,11 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	handleClientMessages(conn, connection)
 }
 
-func initializeConnection(conn *websocket.Conn, clientUUID string, maxMsgSize int64) *Connection {
+func initializeConnection(conn *websocket.Conn, clientUUID string) *Connection {
 	return &Connection{
-		conn:           conn,
-		send:           make(chan []byte, 512),
-		clientUUID:     clientUUID,
-		maxMessageSize: maxMsgSize,
+		conn:       conn,
+		send:       make(chan []byte, 512),
+		clientUUID: clientUUID,
 	}
 }
 
@@ -112,53 +97,49 @@ func sendUUIDToClient(connection *Connection, clientUUID string) {
 	})
 }
 
-func handleWrites(connection *Connection) {
-	defer close(connection.send)
-	for msg := range connection.send {
-		connection.conn.SetWriteDeadline(time.Now().Add(writeWait))
-		if err := connection.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-			log.Printf("Error writing message: %v", err)
-			break
-		}
-	}
-}
-
 func handleClientMessages(conn *websocket.Conn, connection *Connection) {
 	var roomID string
 	for {
-		data, err := readClientMessage(conn) // messageType no es necesario aquí
+		messageType, data, err := readClientMessage(conn)
 		if err != nil {
 			handleClientError(connection, roomID, err)
 			break
 		}
 
-		switch data["type"] {
+		switch messageType {
 		case "join":
 			roomID = handleJoin(connection, data)
 		case "close_call":
 			handleClientDisconnect(roomID, connection)
-		case "video_on_remote", "video_off_remote", "mic_on_remote", "mic_off_remote":
-			handleDevicesStatus(connection, data)
-		case "transcript":
-			handleTranscript(data, connection)
-		default:
+		case "start_call", "webrtc_offer", "webrtc_answer", "webrtc_ice_candidate":
 			handleRoomMessage(data, connection)
+		case "transcript_text":
+			handleTranscript(data, connection)
+		case "mic_on_remote", "mic_off_remote", "video_on_remote", "video_off_remote":
+			handleDevicesStatus(connection, data)
+		default:
+			log.Printf("Unknown message type: %s", messageType)
 		}
 	}
 }
 
-func readClientMessage(conn *websocket.Conn) (map[string]interface{}, error) {
+func readClientMessage(conn *websocket.Conn) (string, map[string]interface{}, error) {
 	_, message, err := conn.ReadMessage()
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	var data map[string]interface{}
 	if err := json.Unmarshal(message, &data); err != nil {
-		return nil, fmt.Errorf("error unmarshaling message: %v", err)
+		return "", nil, fmt.Errorf("error unmarshaling message: %v", err)
 	}
 
-	return data, nil // Eliminamos `messageType` ya que se puede acceder a él desde `data`
+	messageType, ok := data["type"].(string)
+	if !ok {
+		return "", nil, fmt.Errorf("invalid message format")
+	}
+
+	return messageType, data, nil
 }
 
 func handleClientError(connection *Connection, roomID string, err error) {
@@ -174,7 +155,9 @@ func handleClientError(connection *Connection, roomID string, err error) {
 func handleJoin(connection *Connection, data map[string]interface{}) string {
 	roomID := getRoomID(data)
 
-	room := addToRoom(connection, roomID)
+	room := getRoom(roomID)
+
+	room = addToRoom(connection, roomID)
 
 	if len(room) == 1 {
 		notifyClient(connection, "room_created", roomID)
@@ -214,12 +197,13 @@ func notifyClient(connection *Connection, eventType, roomID string) {
 
 func handleDevicesStatus(connection *Connection, data map[string]interface{}) {
 	roomID := getRoomID(data)
+	messageType := data["type"].(string)
 
-	// `data["type"]` determina el estado del dispositivo
-	updateDeviceStatus(connection, data["type"].(string))
+	updateDeviceStatus(connection, messageType)
 
+	// room := getRoom(roomID)
 	broadcastToRoom(roomID, map[string]interface{}{
-		"type":     data["type"],
+		"type":     messageType,
 		"uuid":     connection.clientUUID,
 		"cameraOn": connection.cameraOn,
 		"audioOn":  connection.audioOn,
@@ -231,19 +215,22 @@ func handleTranscript(data map[string]interface{}, connection *Connection) {
 	messageType := data["type"].(string)
 	messageText, ok := data["text"].(string)
 	if !ok {
-		messageText = ""
+		messageText = "" // Asignar un valor por defecto si no está presente
 	}
 
+	// Actualizar el estado del dispositivo, aunque esto parece innecesario para transcripción
 	updateDeviceStatus(connection, messageType)
 
+	// Crear el mensaje que será retransmitido
 	message := map[string]interface{}{
 		"type":     messageType,
 		"uuid":     connection.clientUUID,
 		"cameraOn": connection.cameraOn,
 		"audioOn":  connection.audioOn,
-		"message":  messageText,
+		"message":  messageText, // Aquí se incluye el texto de la transcripción
 	}
 
+	// Retransmitir el mensaje a todos los clientes en la sala, excepto al que lo envió
 	broadcastToRoom(roomID, message, connection.clientUUID)
 }
 
@@ -269,11 +256,15 @@ func getRoom(roomID string) map[*websocket.Conn]string {
 
 func handleClientDisconnect(roomID string, connection *Connection) {
 	removeFromRoom(roomID, connection)
-	broadcastToRoom(roomID, map[string]interface{}{
-		"type":   "close_call",
-		"uuid":   connection.clientUUID,
-		"roomId": roomID,
-	}, connection.clientUUID)
+
+	room := getRoom(roomID)
+	if len(room) > 0 {
+		broadcastToRoom(roomID, map[string]interface{}{
+			"type":   "close_call",
+			"uuid":   connection.clientUUID,
+			"roomId": roomID,
+		}, connection.clientUUID)
+	}
 }
 
 func removeFromRoom(roomID string, connection *Connection) {
@@ -309,29 +300,57 @@ func broadcastToRoom(roomID string, message map[string]interface{}, senderUUID s
 }
 
 func sendMessageToClient(conn *websocket.Conn, message map[string]interface{}, clientUUID string) {
-	conn.SetWriteDeadline(time.Now().Add(writeWait))
-
-	message["uuid"] = clientUUID
-
-	if err := conn.WriteJSON(message); err != nil {
-		log.Printf("Error sending message to client %s: %v", clientUUID, err)
+	if err := conn.WriteMessage(websocket.TextMessage, encodeJSON(message)); err != nil {
+		log.Printf("Error broadcasting to client %s: %v", clientUUID, err)
 		conn.Close()
+		removeConnectionFromRoom(conn)
+	} else {
+		log.Printf("Message sent to client %s", clientUUID)
 	}
 }
 
-func encodeJSON(data map[string]interface{}) []byte {
-	result, _ := json.Marshal(data)
-	return result
+func removeConnectionFromRoom(conn *websocket.Conn) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	for roomID, room := range rooms {
+		delete(room, conn)
+		if len(room) == 0 {
+			delete(rooms, roomID)
+		}
+	}
+}
+
+func handleWrites(connection *Connection) {
+	defer close(connection.send)
+
+	for msg := range connection.send {
+		if err := connection.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+			log.Printf("Error writing message: %v", err)
+			break
+		}
+	}
 }
 
 func handleRoomMessage(data map[string]interface{}, connection *Connection) {
 	roomID := getRoomID(data)
+	room := getRoom(roomID)
 
-	message := map[string]interface{}{
-		"type": "room_message",
-		"uuid": connection.clientUUID,
-		"text": data["text"].(string),
+	for client := range room {
+		if client != connection.conn {
+			data["from"] = connection.clientUUID
+			data["audioOn"] = connection.audioOn
+			data["cameraOn"] = connection.cameraOn
+			client.WriteMessage(websocket.TextMessage, encodeJSON(data))
+		}
 	}
+}
 
-	broadcastToRoom(roomID, message, connection.clientUUID)
+func encodeJSON(data map[string]interface{}) []byte {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Printf("Error encoding JSON: %v", err)
+		return nil
+	}
+	return jsonData
 }
