@@ -148,6 +148,7 @@ func handleClientError(connection *Connection, roomID string, err error) {
 		handleClientDisconnect(roomID, connection)
 	} else {
 		log.Printf("Error reading message: %v", err)
+		handleClientDisconnect(roomID, connection)
 	}
 }
 
