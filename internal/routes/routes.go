@@ -153,9 +153,16 @@ func handleClientError(connection *Connection, roomID string, err error) {
 
 func handleJoin(connection *Connection, data map[string]interface{}) string {
 	roomID := getRoomID(data)
-	_ = addToRoom(connection, roomID)
-	notifyClient(connection, "room_joined", roomID)
-	broadcastToRoom(roomID, map[string]interface{}{"type": "start_call"}, connection.clientUUID)
+
+	room := addToRoom(connection, roomID)
+
+	if len(room) == 1 {
+		notifyClient(connection, "room_created", roomID)
+	} else {
+		notifyClient(connection, "room_joined", roomID)
+		broadcastToRoom(roomID, map[string]interface{}{"type": "start_call"}, connection.clientUUID)
+	}
+
 	return roomID
 }
 
