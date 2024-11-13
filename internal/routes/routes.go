@@ -30,11 +30,12 @@ var (
 )
 
 type Connection struct {
-	conn       *websocket.Conn
-	send       chan []byte
-	clientUUID string
-	cameraOn   bool
-	audioOn    bool
+	conn           *websocket.Conn
+	send           chan []byte
+	clientUUID     string
+	cameraOn       bool
+	audioOn        bool
+	maxMessageSize int64
 }
 
 // HandleConnection gestiona la nueva conexión WebSocket
@@ -47,10 +48,23 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	clientUUID := uuid.New().String()
-	connection := initializeConnection(conn, clientUUID)
 
-	// Configurar el tiempo de espera del pong
-	conn.SetReadLimit(maxMessageSize)
+	// Leer el mensaje inicial para configuración
+	_, data, err := readClientMessage(conn)
+	if err != nil {
+		log.Printf("Error reading initial config: %v", err)
+		return
+	}
+
+	// Si se envía `maxMessageSize` en el mensaje inicial, úsalo; si no, usa un valor predeterminado
+	var maxMessageSize int64 = 4096
+	if size, ok := data["maxMessageSize"].(float64); ok {
+		maxMessageSize = int64(size)
+	}
+
+	connection := initializeConnection(conn, clientUUID, maxMessageSize)
+
+	conn.SetReadLimit(connection.maxMessageSize)
 	conn.SetReadDeadline(time.Now().Add(pongWait))
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -58,14 +72,11 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	})
 
 	go handleWrites(connection)
-
 	sendUUIDToClient(connection, clientUUID)
 
-	// Iniciar el temporizador de ping
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
 
-	// Manejar mensajes del cliente y enviar pings periódicos
 	go func() {
 		for {
 			select {
@@ -82,11 +93,12 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	handleClientMessages(conn, connection)
 }
 
-func initializeConnection(conn *websocket.Conn, clientUUID string) *Connection {
+func initializeConnection(conn *websocket.Conn, clientUUID string, maxMsgSize int64) *Connection {
 	return &Connection{
-		conn:       conn,
-		send:       make(chan []byte, 512),
-		clientUUID: clientUUID,
+		conn:           conn,
+		send:           make(chan []byte, 512),
+		clientUUID:     clientUUID,
+		maxMessageSize: maxMsgSize,
 	}
 }
 
