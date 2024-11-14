@@ -14,7 +14,8 @@ func main() {
 	// Get the local machine's IP address (in the local network)
 	localIP, err := getLocalIP()
 	if err != nil {
-		log.Fatalf("Error getting local IP: %v", err)
+		localIP = "127.0.0.1"
+		fmt.Println("Error getting local IP address:", err)
 	}
 
 	// Define the folder where your Angular app is built (adjust the path to where your 'dist' folder is located)
