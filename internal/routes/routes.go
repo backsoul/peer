@@ -50,7 +50,7 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	connection := initializeConnection(conn, clientUUID)
 
 	// Configurar el tiempo de espera del pong
-	conn.SetReadLimit(maxMessageSize)
+	// conn.SetReadLimit(maxMessageSize)
 	conn.SetReadDeadline(time.Now().Add(pongWait))
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -108,10 +108,13 @@ func handleClientMessages(conn *websocket.Conn, connection *Connection) {
 
 		switch messageType {
 		case "join":
+			fmt.Println("Client joined: ", connection.clientUUID)
 			roomID = handleJoin(connection, data)
 		case "close_call":
+			fmt.Println("Client close call: ", connection.clientUUID)
 			handleClientDisconnect(roomID, connection)
 		case "start_call", "webrtc_offer", "webrtc_answer", "webrtc_ice_candidate":
+			fmt.Println("Client start call: ", connection.clientUUID)
 			handleRoomMessage(data, connection)
 		case "transcript_text":
 			handleTranscript(data, connection)
@@ -154,17 +157,7 @@ func handleClientError(connection *Connection, roomID string, err error) {
 func handleJoin(connection *Connection, data map[string]interface{}) string {
 	roomID := getRoomID(data)
 
-	room := getRoom(roomID)
-	if len(room) >= 2 {
-		connection.send <- encodeJSON(map[string]interface{}{
-			"type":   "full_room",
-			"roomId": roomID,
-		})
-		connection.conn.Close()
-		return ""
-	}
-
-	room = addToRoom(connection, roomID)
+	room := addToRoom(connection, roomID)
 
 	if len(room) == 1 {
 		notifyClient(connection, "room_created", roomID)

@@ -1,0 +1,25 @@
+[ req ]
+default_bits        = 2048
+default_keyfile     = privkey.pem
+distinguished_name  = req_distinguished_name
+x509_extensions     = v3_req
+string_mask         = utf8only
+
+[ req_distinguished_name ]
+countryName         = CO
+countryName_default = CO
+stateOrProvinceName = BGA
+stateOrProvinceName_default = Some-State
+localityName        = Bucaramanga
+localityName_default = Bucaramanga
+organizationalName  = Personal use
+organizationalName_default = Personal use
+commonName          = backsoul
+commonName_default  = localhost
+
+[ v3_req ]
+subjectAltName = @alt_names
+
+[ alt_names ]
+DNS.1 = localhost
+IP.1 = 192.168.1.120
