@@ -21,12 +21,15 @@ Peer es un proyecto de comunicación en tiempo real que utiliza **WebRTC**, **Go
 
 ### Paso 1: Instalar Termux (Opcional)
 
-Si estás en un dispositivo Android, puedes instalar **Termux** desde la [Play Store](https://play.google.com/store).
+Si estás en un dispositivo Android, puedes instalar **Termux** desde la [Play Store](https://play.google.com/store/search?q=termux&c=apps).
 
 ### Paso 2: Instalar Go Lang
 
-1. Descarga e instala **Go Lang** desde su [sitio oficial](https://golang.org/dl/).
-2. Verifica la instalación ejecutando el siguiente comando en tu terminal:
+1. Instala **Go Lang** con el siguiente commando en tu terminal de termux:
+   ```bash
+    pkg install golang
+   ```
+   Verifica la version instalada de Go con el siguiente comando:
    ```bash
    go version
    ```
