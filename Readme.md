@@ -19,7 +19,7 @@ Peer es un proyecto de comunicación en tiempo real que utiliza **WebRTC**, **Go
 
 ## Tutorial de Instalación y Ejecución (Android)
 
-### Paso 1: Instalar Termux (Opcional)
+### Paso 1: Instalar Termux
 
 Si estás en un dispositivo Android, puedes instalar **Termux** desde la [Play Store](https://play.google.com/store/search?q=termux&c=apps).
 
